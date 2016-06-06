@@ -18,10 +18,17 @@ type Msg
 
 init : ( Model, Cmd Msg )
 init =
-  let x = { diagram = fst Diagram.init }
-      y = fst <| update (AddBall 110 120) x 
-      z = fst <| update (AddBall 130 320) y
-  in noFx z
+  let a = { diagram = fst Diagram.init }
+      b = fst <| update (AddBall 70 50 ) a
+      c = fst <| update (AddBall 210 50 ) b
+      d = fst <| update (AddBall 350 50 ) c
+      e = fst <| update (AddBall 130 150 ) d
+      f = fst <| update (AddBall 70 250 ) e
+      g = fst <| update (AddBall 270 250 ) f
+      h = fst <| update (AddBall 50 350 ) g
+      i = fst <| update (AddBall 190 350 ) h
+      k = fst <| update (AddBall 330 350 ) i
+  in noFx k
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
