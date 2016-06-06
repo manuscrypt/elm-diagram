@@ -1,4 +1,6 @@
+import Html
 import Html.App as App
+import Html.Attributes as HA
 import Color exposing (Color)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
 import Svg exposing (Svg)
@@ -42,7 +44,10 @@ update msg model =
 
 view : Model -> Svg Msg
 view model =
-  App.map DiagramMsg <| Diagram.view model.diagram
+  Html.div [] 
+    [ Html.img [posStyle, HA.src "https://raw.githubusercontent.com/elm-lang/projects/master/compiler-progress-visualization/mock.gif" ] []
+    , App.map DiagramMsg <| Diagram.view model.diagram
+    ] 
 
 main : Program Never
 main =
@@ -52,3 +57,14 @@ main =
     , update = update
     , subscriptions = (\_->Sub.none)
     }
+
+(=> ) = (,)
+
+posStyle  = 
+  HA.style 
+  [ "top" => "90px"
+  , (,) "left" "132px"
+  , (,) "position" "absolute"
+  , (,) "border" "1px solid black"
+  , (,) "opacity" "0.1"
+  ]
