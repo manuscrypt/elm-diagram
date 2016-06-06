@@ -4,6 +4,7 @@ import Math.Vector2 exposing (Vec2, vec2, getX, getY)
 import Html
 import Html.Attributes as HA exposing (..)
 import Html.App as App
+import Color exposing (Color)
 import Dict exposing (insert)
 import Symbol
 import Svg exposing (Svg)
@@ -21,7 +22,7 @@ type alias Model =
 
 
 type Msg
-    = Add Symbol.Model
+    = Add Symbol.Shape Color Vec2 Vec2
     | Modify Int Symbol.Msg
 
 
@@ -38,12 +39,12 @@ init =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Add sym ->
-            let
-                newSym =
-                    insert (Dict.size model.symbols) sym model.symbols
+        Add shape color size pos ->
+            let newId = Dict.size model.symbols
+                (symbol,fx) = Symbol.init shape color size pos
+                newSym = insert newId symbol model.symbols
             in
-                noFx { model | symbols = newSym }
+                ({ model | symbols = newSym }, Cmd.map (Modify newId) fx)
 
         Modify id msg ->
             noFx model
