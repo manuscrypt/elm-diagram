@@ -30,7 +30,8 @@ init =
       h = fst <| update (AddBall 50 350 ) g
       i = fst <| update (AddBall 190 350 ) h
       k = fst <| update (AddBall 330 350 ) i
-  in noFx k
+      l = fst <| update (DiagramMsg (Connect 0 1)) k
+  in noFx { l | diagram = fst <| Diagram.update (Diagram.Connect 1 3) l.diagram }
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -41,13 +42,32 @@ update msg model =
         DiagramMsg msg -> 
           noFx model
 
+diagram: Model->Svg Msg
+diagram model = 
+  Html.div [ HA.style [ (,) "z-index" "1"
+                      , (,) "opacity" "1"
+                      , (,) "position" "absolute"
+                      ]
+           ] [ App.map DiagramMsg <| Diagram.view model.diagram ]
+
+template: Svg Msg
+template = 
+  Html.img [ HA.style [ (,) "position" "absolute"
+             , (,) "top" "-10px"
+             , (,) "left" "-10px"
+             , (,) "border" "1px solid black"
+             , (,) "opacity" "0.1"
+             , (,) "z-index" "2"
+              ]
+           , HA.src "https://raw.githubusercontent.com/elm-lang/projects/master/compiler-progress-visualization/mock.gif" 
+           ] []
 
 view : Model -> Svg Msg
 view model =
-  Html.div [] 
-    [ Html.img [posStyle, HA.src "https://raw.githubusercontent.com/elm-lang/projects/master/compiler-progress-visualization/mock.gif" ] []
-    , App.map DiagramMsg <| Diagram.view model.diagram
-    ] 
+    Html.div [ HA.style [] ]
+      [ diagram model
+      , template
+      ]
 
 main : Program Never
 main =
@@ -57,14 +77,3 @@ main =
     , update = update
     , subscriptions = (\_->Sub.none)
     }
-
-(=> ) = (,)
-
-posStyle  = 
-  HA.style 
-  [ "top" => "90px"
-  , (,) "left" "132px"
-  , (,) "position" "absolute"
-  , (,) "border" "1px solid black"
-  , (,) "opacity" "0.1"
-  ]
