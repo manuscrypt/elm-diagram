@@ -10,7 +10,7 @@ import String
 
 
 type alias Model =
-    { from: Vec2 
+    { from: Vec2
     , to : Vec2
     , width : Int
     , stroke : Color
@@ -34,7 +34,7 @@ update msg model =
 
 view : Model -> Svg Msg
 view model =
-    Svg.path ([SA.style "fill:white;stroke-width:2"] ++ ( attrs <| quadraticBezier model )) []
+    Svg.path ([SA.style "fill:transparent;stroke:red;stroke-width:2"] ++ ( attrs <| quadraticBezier model )) []
 
 translate : Vec2 -> String
 translate pos =
@@ -69,15 +69,15 @@ quadraticBezier model =
         p3 = add p2 (add third <| Vec2.negate n )
         p4 = sub model.to (add third <| Vec2.negate n )
         path =  ds "M" [ getX model.from, getY model.from ]
-                ++ ds "C" [ getX p1, getY p1 ] ++ "," 
-                ++ ds "" [ getX p2, getY p2 ] ++ "," 
-                ++ ds "" [ getX p3, getY p3 ] ++ " " 
+                ++ ds "C" [ getX p1, getY p1 ] ++ ","
+                ++ ds "" [ getX p2, getY p2 ] ++ ","
+                ++ ds "" [ getX p3, getY p3 ] ++ " "
                 ++ ds "S" [ getX p4, getY p4 ] ++ ", "
                 ++ ds "" [ getX model.to, getY model.to ]
                 |> Debug.log "dVal"
---    in [ (,) SA.d <| "M" ++ sxy model.from ++ " Q" ++ sxy ctrlPoint ++ " " ++ sxy model.to ] 
+--    in [ (,) SA.d <| "M" ++ sxy model.from ++ " Q" ++ sxy ctrlPoint ++ " " ++ sxy model.to ]
 --                ++ ds "A" [ radius, radius, 0, 0, 1, getX model.to, getY model.to ]
-    in [ (,) SA.d path] 
+    in [ (,) SA.d path]
 
 connection : Model -> List ( String -> Svg.Attribute b, String )
 connection model =
@@ -89,4 +89,3 @@ connection model =
     , ( SA.width, toString model.width )
     , ( SA.fill, "black" )
     ]
-
