@@ -1,17 +1,19 @@
 module Connection exposing (..)
 
 import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY, add, scale, sub, negate)
+import Math.Vector4 as Vec4 exposing (Vec4, vec4, getX, getY, getZ, getW)
 import Svg exposing (Svg)
 import Svg.Attributes as SA
 import Util exposing (noFx)
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
 import String
-
+import Array
+import Symbol
+import SvgUtil exposing (path)
 
 type alias Model =
-    { from: Vec2
-    , to : Vec2
+    { symbols: List (Symbol.Model)
     , width : Int
     , stroke : Color
     }
@@ -20,11 +22,11 @@ type alias Model =
 type Msg
     = NoOp
 
+splineStyle =  "fill:transparent;stroke:red;stroke-width:2"
 
-init : Vec2 -> Vec2 -> ( Model, Cmd Msg )
-init from to =
-    let f = Debug.log "connect" (from,to)
-    in noFx <| Model from to 3 Color.black
+init : List Symbol -> ( Model, Cmd Msg )
+init symbols =
+    noFx <| Model symbols 3 Color.black
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -34,7 +36,44 @@ update msg model =
 
 view : Model -> Svg Msg
 view model =
-    Svg.path ([SA.style "fill:transparent;stroke:red;stroke-width:2"] ++ ( attrs <| quadraticBezier model )) []
+    let paths = List.map (SvgUtil.path splineStyle) (splines model.symbols)
+    in Svg.g [] paths 
+
+getAt idx arr = Array.get idx arr |> Maybe.withDefault 0
+setAt idx val arr = Array.set idx val arr 
+
+controlPoints: Array Float -> (Vec2, Vec2)
+controlPoints k =
+    let gk i = getAt i k
+        internal a b c r gk i =
+            (setAt i 1 a, setAt i 4 b, setAt i 1 c, setAt i <| 4*(gk i) + 2 * gk (i+1)) 
+
+        n = -1 + List.length k
+
+        a = Array.repeat 1 0
+        b = Array.repeat 1 2
+        c = Array.repeat 1 1
+        r = Array.repeat 1 ((gk 0)+2*(gk 1))
+
+        (a',b',c',r') = List.map (internal a b c r gk) [1..(n-1)]
+
+        a'' = setAt (n-1) 2
+        b'' = setAt (n-1) 7
+        c'' = setAt (n-1) 0
+        r'' = setAt (n-1) <| 8*(gk (n-1)) + (gk n)
+    in 
+        let p1 = tridiag a b c r
+            p2 = List.map (\i -> 2 * (gk (i+1)) - (getAt (i+1) p1)) [0..(n-1)]
+            p2' = setAt (n-1) (0.5 * ((gk n) + getAt (n-1) p1)) p2
+        in (p1,p2)  
+
+splines symbols =
+    let poses = List.map .pos symbols
+        px = controlPoints (List.map getX poses)
+        py = controlPoints (List.map getY poses)
+        (x::xs) = symbols
+        (ys::y) = symbols
+    in List.map (path x py py y) symbols 
 
 translate : Vec2 -> String
 translate pos =
@@ -45,7 +84,7 @@ sy = toString << getY
 
 sxy vec = (sx vec) ++ "," ++ (sy vec)
 
-
+-- provided by fredcy (thanks!) 
 ds : String -> List number -> String
 ds tag values =
     tag ++ " " ++ (String.join " " (List.map toString values)) ++ " "
@@ -55,6 +94,11 @@ attrs : List ( a -> b, a ) -> List b
 attrs list =
     List.map (\( k, v ) -> k v) list
 
+toSample: Model->List Vec2
+toSample model =
+    let diff = sub model.to model.from 
+    --in [ model.to, add model.to (scale 0.1 diff), sub model.from (scale 0.1 diff), model.from ]
+    in [ model.to,  model.from ]
 
 --M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80
 quadraticBezier : Model -> List ( String -> Svg.Attribute b, String )
@@ -89,3 +133,5 @@ connection model =
     , ( SA.width, toString model.width )
     , ( SA.fill, "black" )
     ]
+
+        --++ ( attrs <| quadraticBezier model )) []

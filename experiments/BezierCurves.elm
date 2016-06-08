@@ -1,9 +1,9 @@
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-import Html exposing (Html)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
 import VirtualDom exposing (Node)
 import String
+import SvgUtil
 
 type alias Sample = List Vec2
 
@@ -19,38 +19,13 @@ samples =
   , [ ( vec2 110 100 ), ( vec2 112 110 ), ( vec2 120 100 ), ( vec2 150 100 ) ]
   , [ ( vec2 110 150 ), ( vec2 112 170 ), ( vec2 120 150 ), ( vec2 150 150 ) ]
   , [ ( vec2 110 200 ), ( vec2 112 230 ), ( vec2 120 200 ), ( vec2 150 200 ) ]
+  , [ ( vec2 110 200 ), ( vec2 112 230 ), ( vec2 120 200 ), ( vec2 150 250 ) ]
   ]
 
-getXs v =
-  toString ( getX v )
-
-getYs v =
-  toString ( getY v )
-
-vecToStr : Vec2 -> String
-vecToStr v =
-  ( getXs v ) ++ " " ++ ( getYs v )
-
-vecToCircle : Vec2 -> VirtualDom.Node a
-vecToCircle v =
-  Svg.circle [ cx ( getXs v ), cy ( getYs v ), r "1", fill "transparent", stroke "red" ] []
-
-sampleToSvgPoints : Sample -> String
-sampleToSvgPoints sample =
-  let head = vecToStr ( Maybe.withDefault ( vec2 0 0 ) ( List.head sample ) )
-  in let tails = String.concat ( List.intersperse ", " ( List.map vecToStr ( Maybe.withDefault [] ( List.tail sample ) ) ) )
-  --in let tails = List.tail sample
-  in
-    "M " ++ head ++ " C " ++ tails
-
-sampleToSvg : Sample -> List ( VirtualDom.Node a )
-sampleToSvg sample =
-  ( List.map vecToCircle sample )
-  ++ [ ( Svg.path [ d ( sampleToSvgPoints sample ), stroke "black", fill "transparent" ] [] ) ]
 
 samplesToSvg : List Sample -> List ( VirtualDom.Node a )
 samplesToSvg samples =
-  List.concat ( List.map sampleToSvg samples )
+  List.concat ( List.map SvgUtil.sampleToSvg samples )
 
 
 --main : Html

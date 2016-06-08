@@ -46,7 +46,6 @@ diagram: Model->Svg Msg
 diagram model = 
   Html.div [ HA.style [ (,) "z-index" "1"
                       , (,) "opacity" "1"
-                      , (,) "position" "absolute"
                       ]
            ] [ App.map DiagramMsg <| Diagram.view model.diagram ]
 
@@ -59,15 +58,18 @@ template =
              , (,) "opacity" "0.1"
              , (,) "z-index" "2"
               ]
-           , HA.src "https://raw.githubusercontent.com/elm-lang/projects/master/compiler-progress-visualization/mock.gif" 
+--           , HA.src "https://raw.githubusercontent.com/elm-lang/projects/master/compiler-progress-visualization/mock.gif" 
            ] []
 
 view : Model -> Svg Msg
 view model =
-    Html.div [ HA.style [] ]
+  Html.div[][
+    Html.div []
       [ diagram model
       , template
       ]
+      , Html.div [HA.style[(,) "clear" "both", (,) "position" "relative"]] [Html.text <| toString model]
+  ]
 
 main : Program Never
 main =

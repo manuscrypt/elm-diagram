@@ -1,5 +1,6 @@
 module Util exposing (..)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
+import Array exposing (get,set)
 
 
 noFx : a -> ( a, Cmd b )
@@ -15,3 +16,7 @@ vecToSvgPos vec =
 warningsFor : String -> String
 warningsFor moduleFileName =
     "elm-make --warn " ++ moduleFileName
+
+getAt idx arr = Array.get idx arr |> Maybe.withDefault 0
+setAt idx val arr = Array.set idx val arr 
+
