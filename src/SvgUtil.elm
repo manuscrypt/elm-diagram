@@ -1,4 +1,4 @@
-module SvgUtil exposing (sampleToSvg,path)
+module SvgUtil exposing (sampleToSvg)
 
 import Svg exposing (..)
 import Svg.Attributes as SA exposing (..)
@@ -34,11 +34,6 @@ sampleToSvg sample =
   ( List.map vecToCircle sample )
   ++ [ ( Svg.path [ d ( sampleToSvgPoints sample ), stroke "black", fill "transparent" ] [] ) ]
 
-s: number->String
-s s = toString s
 
-path: String->(number,number)->(number,number)->(number,number)->(number,number)->Svg a
-path st (x1, y1) (px1, py1) (px2, py2) (x2, y2) =
-  let path = "M " ++  (String.join " " <| List.map s [x1,y1]) ++ " C " ++ (String.join " " <| List.map s [px1,py1,px2,py2,x2,y2])
-  in Svg.path [SA.style st, SA.d path] []
+
 

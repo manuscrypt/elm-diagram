@@ -2,6 +2,7 @@ module ThomasAlgorithm exposing (..)
 
 import Util exposing (..)
 import Array exposing (Array)
+import Tuple2 
 
 -- Solve the  n x n  tridiagonal system for y:
 --
@@ -17,15 +18,10 @@ import Array exposing (Array)
 --  a, b, c must be vectors of length n (note that b(1) and c(n) are not used)
 
 unzip : Array (a,b) -> (Array a, Array b)
-unzip pairs =
-  let
-    step (x,y) (xs,ys) =
-      (x :: xs, y :: ys)
-  in
-    Array.foldr step (Array.empty, Array.empty) pairs
+unzip = Array.toList >> List.unzip >> Tuple2.mapEach Array.fromList Array.fromList
 
-
-tridiag: Array Float -> Array Float -> Array Float -> Array Float -> Array Float
+ 
+tridiag: Array Float -> Array Float -> Array Float -> Array Float -> Array(Array Float)
 tridiag a b c d  =
     --init 
     let n = Array.length a
@@ -35,15 +31,15 @@ tridiag a b c d  =
         (c'',d') = unzip <| Array.map (forwardSweep a b c' d) <| Array.fromList [1..n]
     --reverse sweep
         f' = setAt (n-1) (getAt (n-1) d') f 
-    in Array.map (reverseSweep c'' d' f' << toFloat) [0..(n-1)]
+    in Array.map (reverseSweep c'' d' f') <| Array.fromList [0..(n-1)]
 
-forwardSweep: Array Float -> Array Float -> Array Float -> Array Float -> Int -> (Array Float, Array Float)
+forwardSweep: Array Float -> Array Float -> Array Float -> Array Float -> Int -> (Float,  Float)
 forwardSweep  a b c d i = 
     let m = 1.0 / ((getAt i b) - (getAt i a) * (getAt (i-1) c))
         c' = (getAt i c) * m
         d' = ((getAt i d) - (getAt i a) * (getAt (i-1) d)) * m
     in (c',d')
 
-reverseSweep: Array Float -> Array Float -> Array Float -> Array Float -> Array Float
+reverseSweep: Array Float -> Array Float -> Array Float -> Int -> Array Float
 reverseSweep c d' f i = 
     setAt i ((getAt i d') - ((getAt i c) * (getAt (i+1) f))) f
