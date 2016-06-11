@@ -6,7 +6,6 @@ import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY, add, scale, sub, n
 import Array exposing (Array,fromList)
 import Array.Extra as Array
 import SvgUtil exposing (..)
-import ThomasAlgorithm exposing (tridiag)
 import Util exposing (..)
 
 type alias VecN =
@@ -23,106 +22,85 @@ getYs points =
     Array.map getY <| Array.fromList points
 
 
-computeControlPoints : VecN -> {p1: VecN, p2: VecN}
-computeControlPoints k =
+computeControlPoints : VecN -> Float-> {p1: VecN, p2: VecN}
+computeControlPoints k size =
     let
-        n =
+        n = 
             (Array.length k) - 1
 
         gk i =
-            Array.getUnsafe i k
+            getAt i k
 
         a =
-            fromList [ 0 ]
+            Array.initialize n (always 0)
 
         b =
-            fromList [ 2 ]
+            Array.initialize n (always 2)
 
         c =
-            fromList [ 1 ]
+            Array.initialize n (always 1)
 
         r =
-            fromList [ gk 0 + 2 * (gk 1) ]
+            Array.initialize n (always (gk 0 + 2 * (gk 1)))
 
-        a' =
-            Array.append a <| Array.repeat (n - 2) 1
+        a' = List.foldl (\i ax -> setAt i 1 ax ) a [1..(n-1)]
+        b' = List.foldl (\i bx -> setAt i 4 bx ) b [1..(n-1)]
+        c' = List.foldl (\i cx -> setAt i 1 cx ) c [1..(n-1)]
+        r' = List.foldl (\i rx -> setAt i (4 * (gk i) + 2 * (gk (i + 1))) rx ) r [1..(n-1)]
 
-        b' =
-            Array.append b <| Array.repeat (n - 2) 4
+        a'' = setAt (n-1) 2 a'
+        b'' = setAt (n-1) 7 b'
+        c'' = setAt (n-1) 0 c'
+        r'' = setAt (n-1) (8 * gk (n - 1) + gk n) r'
 
-        c' =
-            Array.append c <| Array.repeat (n - 2) 1
+        p1 = solve a'' b'' c'' r''
+        p2 = Array.initialize n (always 0)
 
-        r' =
-            Array.append r <| Array.initialize (n - 2) (\i -> 4 * (gk i) + 2 * (gk (i + 1)))
+        p2' = List.foldl (\i px ->
+            setAt i (2 * gk (i+1) - (getAt (i+1) p1)) px
+        ) p2 [0..(n-1)]
 
-        a'' =
-            Debug.log "a" <| Array.push 2 a'
+        p2'' = setAt (n-1) (0.5 * ((gk n) + (getAt (n-1) p1))) p2'
 
-        b'' =
-            Debug.log "b" <| Array.push 7 b'
+    in Debug.log "p1p2" {p1 = p1, p2 = p2'' }
 
-        c'' =
-            Debug.log "c" <| Array.push 0 c'
+solve : Array Float -> Array Float -> Array Float -> Array Float -> Array Float
+solve a b c r =
+    let n = Array.length r 
+        (b'',r'') = List.foldl (\i (bx,rx) ->
+            let m = (getAt i a)/(getAt (i-1) bx)
+                b' = setAt i ((getAt i bx) - m * (getAt (i-1) c)) bx
+                r' = setAt i ((getAt i rx) - m * (getAt (i-1) rx)) rx
+            in (b',r')) (b,r) [1..n]
+    in 
+        let p = Array.initialize n (always 0) 
+            p' = setAt (n-1) ((getAt (n-1) r'') / (getAt (n-1) b'')) p
+        in List.foldl (\i p'' -> setAt i ((getAt i r'' - (getAt i c) * (getAt (i+1) p'')) / (getAt i b'')) p'') p' (List.reverse [0..(n-2)])
 
-        r'' =
-            Debug.log "r" <| Array.push (8 * gk (n - 1) + gk n) r'
-
-        tri = Debug.log "tri" <| tridiag a'' b'' c'' r''
-
-        p1 = Maybe.withDefault (Array.fromList [20,20]) <| Array.get 0 tri
-
-        p2' = Array.initialize (n-2) (\i -> (2 * gk (i+1))- (getAt (i+1) p1 ))
-        p2'' = Array.push (0.5 * (gk n + (getAt (n-1) p1))) p2'
-
-    in {p1 = p1, p2 = p2''}
-
-
-splines : List Vec2 -> List String
-splines points =
-    let
+splines : Vec2->List Vec2 -> List String
+splines size points =
+    let xx = Debug.log "size" size
         xs =
             getXs points
 
         ys =
             getYs points
 
-        px = computeControlPoints xs
+        px = Debug.log "px" <| computeControlPoints xs (getX size)
 
-        py =
-            computeControlPoints ys
+        py = Debug.log "py" <| 
+            computeControlPoints ys (getY size)
 
         fst = List.head points
         lst = List.drop (List.length points - 1) points
-        
     in
-         List.map (toPath xs ys px py) [0..(List.length points - 1)] 
+         List.map (toPath xs ys px py) [0..(List.length points - 2)] 
 
 
 toPath : VecN->VecN->{p1: VecN, p2: VecN}->{p1: VecN, p2: VecN}->Int->String
 toPath xs ys px py idx =
   let from = vec2 (getAt idx xs) (getAt idx ys)
-      p1' = vec2 (getAt idx <| px.p1) (getAt idx  <| py.p1)  
-      p2' = vec2 (getAt idx px.p2) (getAt idx <| py.p2)
+      p1' = vec2 (getAt idx px.p1) (getAt idx py.p1)  
+      p2' = vec2 (getAt idx px.p2) (getAt idx py.p2)
       to = vec2 (getAt (idx+1) xs) (getAt (idx+1) ys)  
   in "M " ++ sp from ++ " C " ++ sp p1' ++ " " ++ sp p2' ++ " " ++ sp to
-
- 
-
-
-
--- /*solves Ax=b with the Thomas algorithm (from Wikipedia)*/
--- for (i = 1; i < n; i++)
--- {
---  m = a[i]/b[i-1];
---  b[i] = b[i] - m * c[i - 1];
---  r[i] = r[i] - m*r[i-1];
--- }
--- p1[n-1] = r[n-1]/b[n-1];
--- for (i = n - 2; i >= 0; --i)
---  p1[i] = (r[i] - c[i] * p1[i+1]) / b[i];
--- /*we have p1, now compute p2*/
--- for (i=0;i<n-1;i++)
---  p2[i]=2*K[i+1]-p1[i+1];
--- p2[n-1]=0.5*(K[n]+p1[n-1]);
--- return {p1:p1, p2:p2};

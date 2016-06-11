@@ -64,7 +64,7 @@ update msg model =
                     List.filterMap (\i -> Dict.get i model.symbols) ints
 
                 (c,cx) =
-                    Connection.init syms
+                    Connection.init syms model.size
 
                 newConns =
                     Debug.log "x" (Dict.insert id c model.connections)

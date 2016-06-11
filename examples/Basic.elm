@@ -33,9 +33,15 @@ sample =
   , 330 => 350
   ] 
 
+sample2 = 
+  [ 60 => 60
+  , 220 => 300 
+  , 420 => 300 
+  , 700 => 240
+  ] 
+
 sampleCons = 
-  [ [0,1] 
-  ,  [2,3,5]
+  [ [0,1,2,3] 
   ]
 
 toVec: (Float,Float) -> Math.Vector2.Vec2
@@ -43,7 +49,7 @@ toVec (x,y) = vec2 x y
 
 init : ( Model, Cmd Msg )
 init =
-    let msgs = List.map (\s -> AddBall <| toVec s) sample  
+    let msgs = List.map (\s -> AddBall <| toVec s) sample2  
         msgs' = List.map (\a -> DiagramMsg <| Connect a) sampleCons
         (d,dx) = Diagram.init
         m0 = ({diagram = d}, Cmd.map DiagramMsg dx)

@@ -28,7 +28,8 @@ unzip = Array.toList >> List.unzip >> Tuple2.mapEach Array.fromList Array.fromLi
 tridiag: Array Float -> Array Float -> Array Float -> Array Float -> Array(Array Float)
 tridiag a b c d  =
     --init 
-    let n = Debug.log "len" (Array.length a)
+    let dgb = Debug.log "in" (a,b,c,d) 
+        n = Debug.log "len" (Array.length a)
         f = Array.initialize n (always 0.0)
         c' = Debug.log "c'" (setAt 0 ((/?) (getAt 0 c) (getAt 0 b)) c)
     --forward sweep
