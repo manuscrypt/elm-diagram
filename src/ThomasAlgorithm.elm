@@ -1,6 +1,7 @@
 module ThomasAlgorithm exposing (..)
 
 import Util exposing (..)
+import Html
 import Array exposing (Array)
 import Tuple2 
 
@@ -17,16 +18,19 @@ import Tuple2
 --  f must be a vector (row or column) of length n
 --  a, b, c must be vectors of length n (note that b(1) and c(n) are not used)
 
+(/?) a b = if b == 0 then 0 else  (a / b)
+
 unzip : Array (a,b) -> (Array a, Array b)
 unzip = Array.toList >> List.unzip >> Tuple2.mapEach Array.fromList Array.fromList
 
+--(/?) a b = if (b==0) 0 else (a/b)
  
 tridiag: Array Float -> Array Float -> Array Float -> Array Float -> Array(Array Float)
 tridiag a b c d  =
     --init 
-    let n = Array.length a
+    let n = Debug.log "len" (Array.length a)
         f = Array.initialize n (always 0.0)
-        c' = setAt 0 ((getAt 0 c)/(getAt 0 b)) c
+        c' = Debug.log "c'" (setAt 0 ((/?) (getAt 0 c) (getAt 0 b)) c)
     --forward sweep
         (c'',d') = unzip <| Array.map (forwardSweep a b c' d) <| Array.fromList [1..n]
     --reverse sweep
@@ -35,7 +39,7 @@ tridiag a b c d  =
 
 forwardSweep: Array Float -> Array Float -> Array Float -> Array Float -> Int -> (Float,  Float)
 forwardSweep  a b c d i = 
-    let m = 1.0 / ((getAt i b) - (getAt i a) * (getAt (i-1) c))
+    let m = (/?) 1.0 ((getAt i b) - (getAt i a) * (getAt (i-1) c))
         c' = (getAt i c) * m
         d' = ((getAt i d) - (getAt i a) * (getAt (i-1) d)) * m
     in (c',d')
@@ -43,3 +47,10 @@ forwardSweep  a b c d i =
 reverseSweep: Array Float -> Array Float -> Array Float -> Int -> Array Float
 reverseSweep c d' f i = 
     setAt i ((getAt i d') - ((getAt i c) * (getAt (i+1) f))) f
+
+main = Html.text <| toString 
+    <| tridiag 
+        (Array.fromList [1, 0, 0, 0])
+        (Array.fromList [0, 1, 0, 0])
+        (Array.fromList [0, 0, 1, 0])
+        (Array.fromList [0, 0, 0, 1])

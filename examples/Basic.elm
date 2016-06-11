@@ -2,45 +2,73 @@ import Html
 import Html.App as App
 import Html.Attributes as HA
 import Color exposing (Color)
-import Math.Vector2 exposing (Vec2, vec2, getX, getY)
+import Math.Vector2 exposing (Vec2, vec2, getX, getY,setX,setY)
 import Svg exposing (Svg)
 
 import Util exposing ( noFx)
 import Diagram exposing (..)
 import Symbol exposing (..)
+import Tuple2 exposing (..)
 
 type alias Model = 
   { diagram: Diagram.Model
   }
 
 type Msg 
-  = AddBall Float Float
+  = NoOp
+  | AddBall Math.Vector2.Vec2
   | DiagramMsg Diagram.Msg
 
+(=>) = (,)
+
+sample = 
+  [ 70 => 50
+  , 210 => 50 
+  , 350 => 50 
+  , 130 => 150
+  , 70 => 250 
+  , 270 => 250
+  , 50 => 350 
+  , 190 => 350 
+  , 330 => 350
+  ] 
+
+sampleCons = 
+  [ [0,1] 
+  ,  [2,3,5]
+  ]
+
+toVec: (Float,Float) -> Math.Vector2.Vec2
+toVec (x,y) = vec2 x y  
 
 init : ( Model, Cmd Msg )
 init =
-  let a = { diagram = fst Diagram.init }
-      b = fst <| update (AddBall 70 50 ) a
-      c = fst <| update (AddBall 210 50 ) b
-      d = fst <| update (AddBall 350 50 ) c
-      e = fst <| update (AddBall 130 150 ) d
-      f = fst <| update (AddBall 70 250 ) e
-      g = fst <| update (AddBall 270 250 ) f
-      h = fst <| update (AddBall 50 350 ) g
-      i = fst <| update (AddBall 190 350 ) h
-      k = fst <| update (AddBall 330 350 ) i
-      l = fst <| update (DiagramMsg (Connect 0 1)) k
-  in noFx { l | diagram = fst <| Diagram.update (Diagram.Connect 1 3) l.diagram }
+    let msgs = List.map (\s -> AddBall <| toVec s) sample  
+        msgs' = List.map (\a -> DiagramMsg <| Connect a) sampleCons
+        (d,dx) = Diagram.init
+        m0 = ({diagram = d}, Cmd.map DiagramMsg dx)
+    in updateMany (msgs ++ msgs') m0
+
+updateOne: Msg->( Model, Cmd Msg) -> ( Model, Cmd Msg )
+updateOne msg (m,fx) = 
+  let (m1,m1x) = update msg m
+  in m1 ! [fx, m1x]
+
+updateMany : List Msg -> ( Model, Cmd Msg) -> ( Model, Cmd Msg )
+updateMany msgs modelCmd = List.foldl updateOne modelCmd msgs
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        AddBall x y ->
-          let (d,fx) = Diagram.update (Add Symbol.Circle Color.white (vec2 20 20 ) (vec2 x y)) model.diagram
-          in noFx { model | diagram = d }
+        NoOp -> noFx model
+          
+        AddBall vec -> 
+          let msg = Diagram.Add Symbol.Circle Color.white (vec2 20 20) vec
+          in update (DiagramMsg msg) model
+        
         DiagramMsg msg -> 
-          noFx model
+          let (d,fx) = Diagram.update msg model.diagram
+          in ({ model | diagram = d }, Cmd.map DiagramMsg fx)
 
 diagram: Model->Svg Msg
 diagram model = 
@@ -52,18 +80,18 @@ diagram model =
 template: Svg Msg
 template = 
   Html.img [ HA.style [ (,) "position" "absolute"
-             , (,) "top" "-10px"
-             , (,) "left" "-10px"
-             , (,) "border" "1px solid black"
-             , (,) "opacity" "0.1"
-             , (,) "z-index" "2"
-              ]
---           , HA.src "https://raw.githubusercontent.com/elm-lang/projects/master/compiler-progress-visualization/mock.gif" 
+                      , (,) "top" "-10px"
+                      , (,) "left" "-10px"
+                      , (,) "border" "1px solid black"
+                      , (,) "opacity" "0.1"
+                      , (,) "z-index" "2"
+                      ]
+           --, HA.src "https://raw.githubusercontent.com/elm-lang/projects/master/compiler-progress-visualization/mock.gif" 
            ] []
 
 view : Model -> Svg Msg
 view model =
-  Html.div[][
+  Html.div[ bodyStyle ][
     Html.div []
       [ diagram model
       , template
@@ -79,3 +107,12 @@ main =
     , update = update
     , subscriptions = (\_->Sub.none)
     }
+
+bodyStyle : Html.Attribute a
+bodyStyle =
+    HA.style
+        [ (,) "width" "920px"
+        , (,) "margin" "auto"
+        , (,) "border" "1px solid black"
+        , (,) "background-color" "#EEEEEE"
+        ]

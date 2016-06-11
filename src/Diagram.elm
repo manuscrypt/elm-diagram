@@ -11,6 +11,7 @@ import Connection
 import Svg exposing (Svg)
 import Svg.Attributes as SA
 import Util exposing (noFx)
+import SvgUtil exposing (sx,sy)
 
 
 type alias Model =
@@ -20,9 +21,10 @@ type alias Model =
     , connections : Dict.Dict Int Connection.Model
     }
 
+
 type Msg
     = Add Symbol.Shape Color Vec2 Vec2
-    | Connect Int Int
+    | Connect (List Int)
     | Modify Int Symbol.Msg
     | ModifyConnection Int Connection.Msg
 
@@ -52,22 +54,37 @@ update msg model =
                     insert newId symbol model.symbols
             in
                 ( { model | symbols = newSym }, Cmd.map (Modify newId) fx )
+ 
+        Connect ints ->
+            let
+                id =
+                    (Dict.size model.connections)
 
-        Connect from to ->
-            let a = Dict.get from model.symbols |> Maybe.map .pos |> Maybe.withDefault (vec2 0 0)
-                b = Dict.get to model.symbols |> Maybe.map .pos |> Maybe.withDefault (vec2 0 0)
-                newConns = Dict.insert (Dict.size model.connections) (Connection.Model a b 3 Color.black) model.connections         
-            in noFx { model | connections = newConns }
+                syms =
+                    List.filterMap (\i -> Dict.get i model.symbols) ints
+
+                (c,cx) =
+                    Connection.init syms
+
+                newConns =
+                    Debug.log "x" (Dict.insert id c model.connections)
+            in
+                ({ model | connections = newConns }, Cmd.map (ModifyConnection id) cx)
 
         Modify id msg ->
             noFx model
+
         ModifyConnection id msg ->
             noFx model
 
 
 viewSymbol : ( Int, Symbol.Model ) -> Svg Msg
 viewSymbol ( id, sym ) =
-    App.map (Modify id) (Symbol.view sym)
+    let pos = sym.pos
+    in Svg.g [] [ App.map (Modify id) (Symbol.view sym)
+                , Svg.text' [SA.x <| sx pos, SA.y <| sy pos ] [Svg.text <| toString id] 
+                ]
+
 
 viewConnection : ( Int, Connection.Model ) -> Svg Msg
 viewConnection ( id, con ) =
@@ -80,16 +97,17 @@ view model =
         ( sw, sh ) =
             ( toString <| getX model.size, toString <| getY model.size )
     in
-        Html.div [ bodyStyle ]
-            [ Svg.svg
+            Svg.svg
                 [ SA.width sw
                 , SA.height sh
                 , SA.viewBox <| "0 0 " ++ sw ++ " " ++ sh
                 ]
-                (( List.map viewSymbol
-                <| Dict.toList model.symbols) ++ 
-                ( List.map viewConnection <| Dict.toList model.connections)) 
-            ]
+                ((List.map viewSymbol
+                    <| Dict.toList model.symbols
+                 )
+                    ++ (List.map viewConnection <| Debug.log "cs" <| Dict.toList model.connections)
+                )
+            
 
 
 main : Program Never
@@ -100,13 +118,3 @@ main =
         , update = update
         , subscriptions = (\_ -> Sub.none)
         }
-
-
-bodyStyle : Html.Attribute a
-bodyStyle =
-    HA.style
-        [ (,) "width" "920px"
-        , (,) "margin" "auto"
-        , (,) "border" "1px solid black"
-        , (,) "background-color" "#EEEEEE"
-        ]
