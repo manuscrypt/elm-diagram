@@ -24,7 +24,7 @@ type alias Model =
 
 
 type Msg
-    = Add Symbol.Shape Color Vec2 Vec2
+    = AddNode Color Vec2 Vec2
     | Connect (List Int)
     | Modify Int Symbol.Msg
     | ModifyConnection Int Connection.Msg
@@ -43,13 +43,13 @@ init =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Add shape color size pos ->
+        AddNode color size pos ->
             let
                 newId =
                     Dict.size model.symbols
 
                 ( symbol, fx ) =
-                    Symbol.init shape color size pos
+                    Symbol.init Symbol.Circle color size pos
 
                 newSym =
                     insert newId symbol model.symbols

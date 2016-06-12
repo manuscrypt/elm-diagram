@@ -1,14 +1,12 @@
 module Symbol exposing (..)
 
-import Math.Vector2 exposing (Vec2, getX, getY)
+import Math.Vector2 as Vec2 exposing (Vec2,vec2,getX, getY)
 import Svg exposing (Svg)
 import Svg.Attributes as SA
 import Util exposing (noFx)
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
 import Time exposing (Time)
-import Animation exposing (Animation)
-import AnimationFrame
 
 
 type Shape
@@ -21,24 +19,17 @@ type alias Model =
     , color : Color
     , size : Vec2
     , pos : Vec2
-    , animation : Animation Color
     }
 
 
 type Msg
     = Move Vec2
+    | SetColor Color
     | Resize Vec2
-    | Animate Time.Time
-
-
-animationStates =
-    [ Color.white, Color.grey, Color.red, Color.green ]
-
 
 init : Shape -> Color -> Vec2 -> Vec2 -> ( Model, Cmd Msg )
 init shape color size pos =
-    noFx <| Model shape color size pos animation
-
+    noFx <| Model shape color size pos
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -46,12 +37,8 @@ update msg model =
         Move pos ->
             noFx { model | pos = pos }
 
-        Animate dt ->
-            noFx
-                { model
-                    | animation = Animation.run dt model.animation
-                    , color = Animation.sample model.animation
-                }
+        SetColor clr ->
+            noFx { model | color = clr }
 
         Resize size ->
             noFx { model | size = size }
@@ -106,28 +93,6 @@ rect model =
     , ( SA.stroke, "black" )
     ]
 
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    if Animation.isDone model.animation then
-        Sub.none
-    else
-        AnimationFrame.diffs Animate
-
-
-animation : Animation Color
-animation =
-    (2 * Time.second)
-        |> Animation.interval
-        |> Animation.map
-            (\t ->
-                if (t < 0.5) then
-                    Color.green
-                else
-                    Color.red
-            )
-
-
-
---    |> Animation.interval
---        |> Animation.map easing
+move: {a | pos: Vec2 } -> Float ->  {a | pos: Vec2 }
+move model t = 
+    { model | pos = Vec2.add model.pos (Vec2.scale t (vec2 1 1))} 

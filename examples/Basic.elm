@@ -7,8 +7,8 @@ import Color exposing (Color)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY)
 import Svg exposing (Svg)
 import Util exposing (noFx,updateOne,updateMany)
+
 import Diagram exposing (..)
-import Symbol exposing (..)
 import Drag exposing (..)
 import Event exposing (..)
 
@@ -21,7 +21,6 @@ type alias Model =
 
 type Msg
     = NoOp
-    | AddBall Math.Vector2.Vec2
     | DiagramMsg Diagram.Msg
     | DragMsg (Drag.Msg Event.Model)
 
@@ -52,12 +51,12 @@ sample2 =
 
 
 sampleCons =
-    [ --      [ 0, 3, 5, 8 ]
-      --    , [ 1, 3, 4, 6 ]
-      --    , [ 2, 5, 7 ]
-      [ 0, 1, 2, 3, 4, 5, 6, 7, 8 ]
+    [ [ 0, 1, 2, 3, 4, 5, 6, 7, 8 ]
     ]
 
+sampleCons4 =
+    [ [ 0, 1, 2, 8, 7, 6, 4, 3, 5 ]
+    ]
 
 sampleCons2 =
     [ [ 0, 3, 4, 6 ]
@@ -65,6 +64,11 @@ sampleCons2 =
     , [ 2, 5, 8 ]
     ]
 
+sampleCons3 = 
+    [ [ 0, 3, 5, 8 ]
+    , [ 1, 3, 4, 6 ]
+    , [ 2, 5, 7 ]
+    ]
 
 toVec : ( Float, Float ) -> Math.Vector2.Vec2
 toVec ( x, y ) =
@@ -75,10 +79,10 @@ init : ( Model, Cmd Msg )
 init =
     let
         msgs =
-            List.map (\s -> AddBall <| toVec s) sample
+            List.map (\s -> DiagramMsg <| AddNode Color.white (vec2 20 20) <| toVec s) sample
 
         msgs' =
-            List.map (\a -> DiagramMsg <| Connect a) sampleCons2
+            List.map (\a -> DiagramMsg <| Connect a) (sampleCons4) 
 
         ( d, dx ) =
             Diagram.init
@@ -101,13 +105,6 @@ update msg model =
     case msg of
         NoOp ->
             noFx model
-
-        AddBall vec ->
-            let
-                msg =
-                    Diagram.Add Symbol.Circle Color.white (vec2 20 20) vec
-            in
-                update (DiagramMsg msg) model
 
         DiagramMsg msg ->
             let ( d, fx ) =
@@ -137,13 +134,12 @@ onDragEvent event model =
                 offset' =
                     Drag.calculateOffsetWithinBounds model.drag event.offset (round <| getY model.diagram.size) event.amount
 
-                event' =
+                event' = Debug.log "evt"
                     { event | offset = offset' }
             in
                 model ! []
 
-        _ ->
-            model ! []
+        _ ->             model ! []
 
 
 diagram : Model -> Svg Msg
@@ -168,7 +164,7 @@ template =
             , (,) "opacity" "0.1"
             , (,) "z-index" "2"
             ]
-          --, HA.src "https://raw.githubusercontent.com/elm-lang/projects/master/compiler-progress-visualization/mock.gif"
+        , HA.src "https://raw.githubusercontent.com/elm-lang/projects/master/compiler-progress-visualization/mock.gif"
         ]
         []
 
@@ -178,7 +174,7 @@ view model =
     Html.div [ bodyStyle ]
         [ Html.div []
             [ diagram model
-            , template
+            --, template
             ]
         , Html.div [ HA.style [ (,) "clear" "both", (,) "position" "relative" ] ] [ Html.text <| toString model ]
         ]
@@ -210,3 +206,12 @@ subscriptions model =
         [ Sub.map DragMsg <| Drag.subscriptions model.drag
         , Sub.map DiagramMsg <| Diagram.subscriptions model.diagram
         ]
+
+
+
+        -- AddBall vec ->
+        --     let
+        --         msg =
+        --             Diagram.AddBall vec
+        --     in
+        --         update (DiagramMsg msg) model
