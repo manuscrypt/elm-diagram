@@ -9,7 +9,9 @@ import Connection
 import Svg exposing (Svg)
 import Svg.Attributes as SA
 import Util exposing (noFx)
-import SvgUtil exposing (sx,sy)
+import SvgUtil exposing (sx, sy)
+
+
 --import Ball
 
 
@@ -37,6 +39,7 @@ init =
         , connections = Dict.empty
         }
 
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -50,10 +53,9 @@ update msg model =
 
                 newSym =
                     insert newId symbol model.symbols
-
             in
                 ( { model | symbols = newSym }, Cmd.map (Modify newId) fx )
- 
+
         Connect ints ->
             let
                 id =
@@ -62,13 +64,13 @@ update msg model =
                 syms =
                     List.filterMap (\i -> Dict.get i model.symbols) ints
 
-                (c,cx) =
+                ( c, cx ) =
                     Connection.init syms model.size
 
                 newConns =
-                    Debug.log "x" (Dict.insert id c model.connections)
+                    Dict.insert id c model.connections
             in
-                ({ model | connections = newConns }, Cmd.map (ModifyConnection id) cx)
+                ( { model | connections = newConns }, Cmd.map (ModifyConnection id) cx )
 
         Modify id msg ->
             noFx model
@@ -79,10 +81,14 @@ update msg model =
 
 viewSymbol : ( Int, Symbol.Model ) -> Svg Msg
 viewSymbol ( id, sym ) =
-    let pos = sym.pos
-    in Svg.g [] [ App.map (Modify id) (Symbol.view sym)
-                , Svg.text' [SA.x <| sx pos, SA.y <| sy pos ] [Svg.text <| toString id] 
-                ]
+    let
+        pos =
+            sym.pos
+    in
+        Svg.g []
+            [ App.map (Modify id) (Symbol.view sym)
+            , Svg.text' [ SA.x <| sx pos, SA.y <| sy pos ] [ Svg.text <| toString id ]
+            ]
 
 
 viewConnection : ( Int, Connection.Model ) -> Svg Msg
@@ -96,22 +102,19 @@ view model =
         ( sw, sh ) =
             ( toString <| getX model.size, toString <| getY model.size )
     in
-            Svg.svg
-                [ SA.width sw
-                , SA.height sh
-                , SA.viewBox <| "0 0 " ++ sw ++ " " ++ sh
-                ]
-                ((List.map viewSymbol
-                    <| Dict.toList model.symbols
-                 )
-                    ++ (List.map viewConnection <| Debug.log "cs" <| Dict.toList model.connections)
-                )
-            
-main : Program Never
-main =
-    App.program
-        { init = init
-        , view = view
-        , update = update
-        , subscriptions = (\_ -> Sub.none)
-        }
+        Svg.svg
+            [ SA.width sw
+            , SA.height sh
+            , SA.viewBox <| "0 0 " ++ sw ++ " " ++ sh
+            ]
+            ((List.map viewSymbol
+                <| Dict.toList model.symbols
+             )
+                ++ (List.map viewConnection <| Dict.toList model.connections)
+            )
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.batch
+        ( Dict.values <| Dict.map (\k v -> Sub.map (Modify k) <| Symbol.subscriptions v ) model.symbols
+        )
