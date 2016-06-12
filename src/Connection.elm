@@ -21,7 +21,7 @@ type Msg
     = NoOp  
 
 splineStyle: String
-splineStyle =  "fill:transparent;stroke:red;stroke-width:2"
+splineStyle =  "fill:transparent;stroke:red;stroke-width:2;z-index:-1000"
 
 init : List Symbol.Model -> Vec2-> ( Model, Cmd Msg )
 init symbols size =
@@ -35,5 +35,5 @@ update msg model =
 
 view : Model -> Svg Msg
 view model =
-    let paths = List.map (\p -> Svg.path [SA.d p, SA.style splineStyle][] ) <| (splines model.screenSize) (List.map .pos model.symbols)
+    let paths = List.map (\p -> Svg.path [SA.d p, SA.style splineStyle][] ) <| splines (List.map .pos model.symbols)
     in Svg.g [] paths

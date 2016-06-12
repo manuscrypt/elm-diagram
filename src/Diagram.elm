@@ -1,8 +1,6 @@
 module Diagram exposing (..)
 
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
-import Html
-import Html.Attributes as HA exposing (..)
 import Html.App as App
 import Color exposing (Color)
 import Dict exposing (insert)
@@ -12,6 +10,7 @@ import Svg exposing (Svg)
 import Svg.Attributes as SA
 import Util exposing (noFx)
 import SvgUtil exposing (sx,sy)
+--import Ball
 
 
 type alias Model =
@@ -38,7 +37,6 @@ init =
         , connections = Dict.empty
         }
 
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -52,6 +50,7 @@ update msg model =
 
                 newSym =
                     insert newId symbol model.symbols
+
             in
                 ( { model | symbols = newSym }, Cmd.map (Modify newId) fx )
  
@@ -108,8 +107,6 @@ view model =
                     ++ (List.map viewConnection <| Debug.log "cs" <| Dict.toList model.connections)
                 )
             
-
-
 main : Program Never
 main =
     App.program

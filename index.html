@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html><head><meta charset="UTF-8"><title>Connection</title><style>html,head,body { padding:0; margin:0; }
+<html><head><meta charset="UTF-8"><title>Diagram</title><style>html,head,body { padding:0; margin:0; }
 body { font-family: calibri, helvetica, arial, sans-serif; }</style><script type="text/javascript">
 (function() {
 'use strict';
@@ -8514,7 +8514,7 @@ var _ManuScriptHub$elm_diagram$Spline$toPath = F5(
 	});
 var _ManuScriptHub$elm_diagram$Spline$solve = F4(
 	function (a, b, c, r) {
-		var n = -1 + _elm_lang$core$Array$length(r);
+		var n = _elm_lang$core$Array$length(r);
 		var _p0 = A3(
 			_elm_lang$core$List$foldl,
 			F2(
@@ -8562,85 +8562,96 @@ var _ManuScriptHub$elm_diagram$Spline$solve = F4(
 			_elm_lang$core$List$reverse(
 				_elm_lang$core$Native_List.range(0, n - 2)));
 	});
-var _ManuScriptHub$elm_diagram$Spline$computeControlPoints = F2(
-	function (k, size) {
-		var c = _elm_lang$core$Array$fromList(
-			_elm_lang$core$Native_List.fromArray(
-				[1]));
-		var b = _elm_lang$core$Array$fromList(
-			_elm_lang$core$Native_List.fromArray(
-				[2]));
-		var a = _elm_lang$core$Array$fromList(
-			_elm_lang$core$Native_List.fromArray(
-				[0]));
-		var gk = function (i) {
-			return A2(_elm_community$array_extra$Array_Extra$getUnsafe, i, k);
-		};
-		var r = _elm_lang$core$Array$fromList(
-			_elm_lang$core$Native_List.fromArray(
-				[
-					gk(0) + (2 * gk(1))
-				]));
-		var n = _elm_lang$core$Array$length(k) - 1;
-		var a$ = A2(
-			_elm_lang$core$Array$append,
-			a,
-			A2(_elm_lang$core$Array$repeat, n - 2, 1));
-		var a$$ = A2(_elm_lang$core$Array$push, 2, a$);
-		var b$ = A2(
-			_elm_lang$core$Array$append,
-			b,
-			A2(_elm_lang$core$Array$repeat, n - 2, 4));
-		var b$$ = A2(_elm_lang$core$Array$push, 7, b$);
-		var c$ = A2(
-			_elm_lang$core$Array$append,
-			c,
-			A2(_elm_lang$core$Array$repeat, n - 2, 1));
-		var c$$ = A2(_elm_lang$core$Array$push, 0, c$);
-		var r$ = A2(
-			_elm_lang$core$Array$append,
-			r,
-			A2(
-				_elm_lang$core$Array$initialize,
-				n - 2,
-				function (i) {
-					return (4 * gk(i)) + (2 * gk(i + 1));
-				}));
-		var r$$ = A2(
-			_elm_lang$core$Array$push,
-			(8 * gk(n - 1)) + gk(n),
-			r$);
-		var p1 = A4(_ManuScriptHub$elm_diagram$Spline$solve, a$$, b$$, c$$, r$$);
-		var p2 = A3(
-			_elm_lang$core$List$foldl,
-			F2(
-				function (i, px) {
-					return A3(
-						_ManuScriptHub$elm_diagram$Util$setAt,
-						i,
-						(2 * gk(i + 1)) - A2(_ManuScriptHub$elm_diagram$Util$getAt, i + 1, p1),
-						px);
-				}),
-			A2(
-				_elm_lang$core$Array$initialize,
-				n - 1,
-				_elm_lang$core$Basics$always(0)),
-			_elm_lang$core$Native_List.range(0, n - 1));
-		var p2$ = A3(
-			_ManuScriptHub$elm_diagram$Util$setAt,
-			n - 1,
-			(0.5 * gk(n)) + A2(_ManuScriptHub$elm_diagram$Util$getAt, n - 1, p1),
-			p2);
-		var p2$$ = A3(
-			_ManuScriptHub$elm_diagram$Util$setAt,
-			n - 1,
-			(0 - size) + A2(_ManuScriptHub$elm_diagram$Util$getAt, n - 1, p2$),
-			p2$);
-		return A2(
-			_elm_lang$core$Debug$log,
-			'p1p2',
-			{p1: p1, p2: p2$$});
-	});
+var _ManuScriptHub$elm_diagram$Spline$computeControlPoints = function (k) {
+	var gk = function (i) {
+		return A2(_ManuScriptHub$elm_diagram$Util$getAt, i, k);
+	};
+	var n = _elm_lang$core$Array$length(k) - 1;
+	var a = A2(
+		_elm_lang$core$Array$initialize,
+		n,
+		_elm_lang$core$Basics$always(0));
+	var b = A2(
+		_elm_lang$core$Array$initialize,
+		n,
+		_elm_lang$core$Basics$always(2));
+	var c = A2(
+		_elm_lang$core$Array$initialize,
+		n,
+		_elm_lang$core$Basics$always(1));
+	var r = A2(
+		_elm_lang$core$Array$initialize,
+		n,
+		_elm_lang$core$Basics$always(
+			gk(0) + (2 * gk(1))));
+	var a$ = A3(
+		_elm_lang$core$List$foldl,
+		F2(
+			function (i, ax) {
+				return A3(_ManuScriptHub$elm_diagram$Util$setAt, i, 1, ax);
+			}),
+		a,
+		_elm_lang$core$Native_List.range(1, n - 1));
+	var b$ = A3(
+		_elm_lang$core$List$foldl,
+		F2(
+			function (i, bx) {
+				return A3(_ManuScriptHub$elm_diagram$Util$setAt, i, 4, bx);
+			}),
+		b,
+		_elm_lang$core$Native_List.range(1, n - 1));
+	var c$ = A3(
+		_elm_lang$core$List$foldl,
+		F2(
+			function (i, cx) {
+				return A3(_ManuScriptHub$elm_diagram$Util$setAt, i, 1, cx);
+			}),
+		c,
+		_elm_lang$core$Native_List.range(1, n - 1));
+	var r$ = A3(
+		_elm_lang$core$List$foldl,
+		F2(
+			function (i, rx) {
+				return A3(
+					_ManuScriptHub$elm_diagram$Util$setAt,
+					i,
+					(4 * gk(i)) + (2 * gk(i + 1)),
+					rx);
+			}),
+		r,
+		_elm_lang$core$Native_List.range(1, n - 1));
+	var a$$ = A3(_ManuScriptHub$elm_diagram$Util$setAt, n - 1, 2, a$);
+	var b$$ = A3(_ManuScriptHub$elm_diagram$Util$setAt, n - 1, 7, b$);
+	var c$$ = A3(_ManuScriptHub$elm_diagram$Util$setAt, n - 1, 0, c$);
+	var r$$ = A3(
+		_ManuScriptHub$elm_diagram$Util$setAt,
+		n - 1,
+		(8 * gk(n - 1)) + gk(n),
+		r$);
+	var p1 = A4(_ManuScriptHub$elm_diagram$Spline$solve, a$$, b$$, c$$, r$$);
+	var p2 = A2(
+		_elm_lang$core$Array$initialize,
+		n,
+		_elm_lang$core$Basics$always(0));
+	var p2$ = A3(
+		_elm_lang$core$List$foldl,
+		F2(
+			function (i, px) {
+				return A3(
+					_ManuScriptHub$elm_diagram$Util$setAt,
+					i,
+					(2 * gk(i + 1)) - A2(_ManuScriptHub$elm_diagram$Util$getAt, i + 1, p1),
+					px);
+			}),
+		p2,
+		_elm_lang$core$Native_List.range(0, n - 1));
+	var p2$$ = A3(
+		_ManuScriptHub$elm_diagram$Util$setAt,
+		n - 1,
+		0.5 * (gk(n) + A2(_ManuScriptHub$elm_diagram$Util$getAt, n - 1, p1)),
+		p2$);
+	return {p1: p1, p2: p2$$};
+};
 var _ManuScriptHub$elm_diagram$Spline$getYs = function (points) {
 	return A2(
 		_elm_lang$core$Array$map,
@@ -8653,36 +8664,29 @@ var _ManuScriptHub$elm_diagram$Spline$getXs = function (points) {
 		_elm_community$elm_linear_algebra$Math_Vector2$getX,
 		_elm_lang$core$Array$fromList(points));
 };
-var _ManuScriptHub$elm_diagram$Spline$splines = F2(
-	function (size, points) {
-		var lst = A2(
-			_elm_lang$core$List$drop,
-			_elm_lang$core$List$length(points) - 1,
-			points);
-		var fst = _elm_lang$core$List$head(points);
-		var ys = _ManuScriptHub$elm_diagram$Spline$getYs(points);
-		var py = A2(
-			_ManuScriptHub$elm_diagram$Spline$computeControlPoints,
-			ys,
-			_elm_community$elm_linear_algebra$Math_Vector2$getY(size));
-		var xs = _ManuScriptHub$elm_diagram$Spline$getXs(points);
-		var px = A2(
-			_ManuScriptHub$elm_diagram$Spline$computeControlPoints,
-			xs,
-			_elm_community$elm_linear_algebra$Math_Vector2$getX(size));
-		return A2(
-			_elm_lang$core$List$map,
-			A4(_ManuScriptHub$elm_diagram$Spline$toPath, xs, ys, px, py),
-			_elm_lang$core$Native_List.range(
-				0,
-				_elm_lang$core$List$length(points) - 2));
-	});
+var _ManuScriptHub$elm_diagram$Spline$splines = function (points) {
+	var lst = A2(
+		_elm_lang$core$List$drop,
+		_elm_lang$core$List$length(points) - 1,
+		points);
+	var fst = _elm_lang$core$List$head(points);
+	var ys = _ManuScriptHub$elm_diagram$Spline$getYs(points);
+	var py = _ManuScriptHub$elm_diagram$Spline$computeControlPoints(ys);
+	var xs = _ManuScriptHub$elm_diagram$Spline$getXs(points);
+	var px = _ManuScriptHub$elm_diagram$Spline$computeControlPoints(xs);
+	return A2(
+		_elm_lang$core$List$map,
+		A4(_ManuScriptHub$elm_diagram$Spline$toPath, xs, ys, px, py),
+		_elm_lang$core$Native_List.range(
+			0,
+			_elm_lang$core$List$length(points) - 2));
+};
 var _ManuScriptHub$elm_diagram$Connection$update = F2(
 	function (msg, model) {
 		var _p0 = msg;
 		return _ManuScriptHub$elm_diagram$Util$noFx(model);
 	});
-var _ManuScriptHub$elm_diagram$Connection$splineStyle = 'fill:transparent;stroke:red;stroke-width:2';
+var _ManuScriptHub$elm_diagram$Connection$splineStyle = 'fill:transparent;stroke:red;stroke-width:2;z-index:-1000';
 var _ManuScriptHub$elm_diagram$Connection$view = function (model) {
 	var paths = A2(
 		_elm_lang$core$List$map,
@@ -8697,9 +8701,7 @@ var _ManuScriptHub$elm_diagram$Connection$view = function (model) {
 				_elm_lang$core$Native_List.fromArray(
 					[]));
 		},
-		A2(
-			_ManuScriptHub$elm_diagram$Spline$splines,
-			model.screenSize,
+		_ManuScriptHub$elm_diagram$Spline$splines(
 			A2(
 				_elm_lang$core$List$map,
 				function (_) {
@@ -8722,9 +8724,211 @@ var _ManuScriptHub$elm_diagram$Connection$init = F2(
 			A4(_ManuScriptHub$elm_diagram$Connection$Model, symbols, size, 3, _elm_lang$core$Color$black));
 	});
 var _ManuScriptHub$elm_diagram$Connection$NoOp = {ctor: 'NoOp'};
+var _elm_lang$html$Html_App$programWithFlags = _elm_lang$virtual_dom$VirtualDom$programWithFlags;
+var _elm_lang$html$Html_App$program = function (app) {
+	return _elm_lang$html$Html_App$programWithFlags(
+		_elm_lang$core$Native_Utils.update(
+			app,
+			{
+				init: function (_p0) {
+					return app.init;
+				}
+			}));
+};
+var _elm_lang$html$Html_App$beginnerProgram = function (_p1) {
+	var _p2 = _p1;
+	return _elm_lang$html$Html_App$programWithFlags(
+		{
+			init: function (_p3) {
+				return A2(
+					_elm_lang$core$Platform_Cmd_ops['!'],
+					_p2.model,
+					_elm_lang$core$Native_List.fromArray(
+						[]));
+			},
+			update: F2(
+				function (msg, model) {
+					return A2(
+						_elm_lang$core$Platform_Cmd_ops['!'],
+						A2(_p2.update, msg, model),
+						_elm_lang$core$Native_List.fromArray(
+							[]));
+				}),
+			view: _p2.view,
+			subscriptions: function (_p4) {
+				return _elm_lang$core$Platform_Sub$none;
+			}
+		});
+};
+var _elm_lang$html$Html_App$map = _elm_lang$virtual_dom$VirtualDom$map;
+var _ManuScriptHub$elm_diagram$Diagram$init = _ManuScriptHub$elm_diagram$Util$noFx(
+	{
+		size: A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 800, 600),
+		gridSize: A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 10, 10),
+		symbols: _elm_lang$core$Dict$empty,
+		connections: _elm_lang$core$Dict$empty
+	});
+var _ManuScriptHub$elm_diagram$Diagram$Model = F4(
+	function (a, b, c, d) {
+		return {size: a, gridSize: b, symbols: c, connections: d};
+	});
+var _ManuScriptHub$elm_diagram$Diagram$ModifyConnection = F2(
+	function (a, b) {
+		return {ctor: 'ModifyConnection', _0: a, _1: b};
+	});
+var _ManuScriptHub$elm_diagram$Diagram$viewConnection = function (_p0) {
+	var _p1 = _p0;
+	return A2(
+		_elm_lang$html$Html_App$map,
+		_ManuScriptHub$elm_diagram$Diagram$ModifyConnection(_p1._0),
+		_ManuScriptHub$elm_diagram$Connection$view(_p1._1));
+};
+var _ManuScriptHub$elm_diagram$Diagram$Modify = F2(
+	function (a, b) {
+		return {ctor: 'Modify', _0: a, _1: b};
+	});
+var _ManuScriptHub$elm_diagram$Diagram$update = F2(
+	function (msg, model) {
+		var _p2 = msg;
+		switch (_p2.ctor) {
+			case 'Add':
+				var _p3 = A4(_ManuScriptHub$elm_diagram$Symbol$init, _p2._0, _p2._1, _p2._2, _p2._3);
+				var symbol = _p3._0;
+				var fx = _p3._1;
+				var newId = _elm_lang$core$Dict$size(model.symbols);
+				var newSym = A3(_elm_lang$core$Dict$insert, newId, symbol, model.symbols);
+				return {
+					ctor: '_Tuple2',
+					_0: _elm_lang$core$Native_Utils.update(
+						model,
+						{symbols: newSym}),
+					_1: A2(
+						_elm_lang$core$Platform_Cmd$map,
+						_ManuScriptHub$elm_diagram$Diagram$Modify(newId),
+						fx)
+				};
+			case 'Connect':
+				var syms = A2(
+					_elm_lang$core$List$filterMap,
+					function (i) {
+						return A2(_elm_lang$core$Dict$get, i, model.symbols);
+					},
+					_p2._0);
+				var _p4 = A2(_ManuScriptHub$elm_diagram$Connection$init, syms, model.size);
+				var c = _p4._0;
+				var cx = _p4._1;
+				var id = _elm_lang$core$Dict$size(model.connections);
+				var newConns = A2(
+					_elm_lang$core$Debug$log,
+					'x',
+					A3(_elm_lang$core$Dict$insert, id, c, model.connections));
+				return {
+					ctor: '_Tuple2',
+					_0: _elm_lang$core$Native_Utils.update(
+						model,
+						{connections: newConns}),
+					_1: A2(
+						_elm_lang$core$Platform_Cmd$map,
+						_ManuScriptHub$elm_diagram$Diagram$ModifyConnection(id),
+						cx)
+				};
+			case 'Modify':
+				return _ManuScriptHub$elm_diagram$Util$noFx(model);
+			default:
+				return _ManuScriptHub$elm_diagram$Util$noFx(model);
+		}
+	});
+var _ManuScriptHub$elm_diagram$Diagram$viewSymbol = function (_p5) {
+	var _p6 = _p5;
+	var _p8 = _p6._1;
+	var _p7 = _p6._0;
+	var pos = _p8.pos;
+	return A2(
+		_elm_lang$svg$Svg$g,
+		_elm_lang$core$Native_List.fromArray(
+			[]),
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(
+				_elm_lang$html$Html_App$map,
+				_ManuScriptHub$elm_diagram$Diagram$Modify(_p7),
+				_ManuScriptHub$elm_diagram$Symbol$view(_p8)),
+				A2(
+				_elm_lang$svg$Svg$text$,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$svg$Svg_Attributes$x(
+						_ManuScriptHub$elm_diagram$SvgUtil$sx(pos)),
+						_elm_lang$svg$Svg_Attributes$y(
+						_ManuScriptHub$elm_diagram$SvgUtil$sy(pos))
+					]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$svg$Svg$text(
+						_elm_lang$core$Basics$toString(_p7))
+					]))
+			]));
+};
+var _ManuScriptHub$elm_diagram$Diagram$view = function (model) {
+	var _p9 = {
+		ctor: '_Tuple2',
+		_0: _elm_lang$core$Basics$toString(
+			_elm_community$elm_linear_algebra$Math_Vector2$getX(model.size)),
+		_1: _elm_lang$core$Basics$toString(
+			_elm_community$elm_linear_algebra$Math_Vector2$getY(model.size))
+	};
+	var sw = _p9._0;
+	var sh = _p9._1;
+	return A2(
+		_elm_lang$svg$Svg$svg,
+		_elm_lang$core$Native_List.fromArray(
+			[
+				_elm_lang$svg$Svg_Attributes$width(sw),
+				_elm_lang$svg$Svg_Attributes$height(sh),
+				_elm_lang$svg$Svg_Attributes$viewBox(
+				A2(
+					_elm_lang$core$Basics_ops['++'],
+					'0 0 ',
+					A2(
+						_elm_lang$core$Basics_ops['++'],
+						sw,
+						A2(_elm_lang$core$Basics_ops['++'], ' ', sh))))
+			]),
+		A2(
+			_elm_lang$core$Basics_ops['++'],
+			A2(
+				_elm_lang$core$List$map,
+				_ManuScriptHub$elm_diagram$Diagram$viewSymbol,
+				_elm_lang$core$Dict$toList(model.symbols)),
+			A2(
+				_elm_lang$core$List$map,
+				_ManuScriptHub$elm_diagram$Diagram$viewConnection,
+				A2(
+					_elm_lang$core$Debug$log,
+					'cs',
+					_elm_lang$core$Dict$toList(model.connections)))));
+};
+var _ManuScriptHub$elm_diagram$Diagram$main = {
+	main: _elm_lang$html$Html_App$program(
+		{
+			init: _ManuScriptHub$elm_diagram$Diagram$init,
+			view: _ManuScriptHub$elm_diagram$Diagram$view,
+			update: _ManuScriptHub$elm_diagram$Diagram$update,
+			subscriptions: function (_p10) {
+				return _elm_lang$core$Platform_Sub$none;
+			}
+		})
+};
+var _ManuScriptHub$elm_diagram$Diagram$Connect = function (a) {
+	return {ctor: 'Connect', _0: a};
+};
+var _ManuScriptHub$elm_diagram$Diagram$Add = F4(
+	function (a, b, c, d) {
+		return {ctor: 'Add', _0: a, _1: b, _2: c, _3: d};
+	});
 var Elm = {};
-Elm['Connection'] = Elm['Connection'] || {};
-_elm_lang$core$Native_Platform.addPublicModule(Elm['Connection'], 'Connection', typeof _ManuScriptHub$elm_diagram$Connection$main === 'undefined' ? null : _ManuScriptHub$elm_diagram$Connection$main);
+Elm['Diagram'] = Elm['Diagram'] || {};
+_elm_lang$core$Native_Platform.addPublicModule(Elm['Diagram'], 'Diagram', typeof _ManuScriptHub$elm_diagram$Diagram$main === 'undefined' ? null : _ManuScriptHub$elm_diagram$Diagram$main);
 
 if (typeof define === "function" && define['amd'])
 {
@@ -8755,4 +8959,4 @@ for (var publicModule in Elm)
 }
 
 }).call(this);
-</script></head><body><script type="text/javascript">Elm.Connection.fullscreen()</script></body></html>
+</script></head><body><script type="text/javascript">Elm.Diagram.fullscreen()</script></body></html>

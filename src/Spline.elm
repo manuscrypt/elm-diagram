@@ -4,7 +4,6 @@ module Spline exposing (..)
 import List
 import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY, add, scale, sub, negate)
 import Array exposing (Array,fromList)
-import Array.Extra as Array
 import SvgUtil exposing (..)
 import Util exposing (..)
 
@@ -22,8 +21,8 @@ getYs points =
     Array.map getY <| Array.fromList points
 
 
-computeControlPoints : VecN -> Float-> {p1: VecN, p2: VecN}
-computeControlPoints k size =
+computeControlPoints : VecN -> {p1: VecN, p2: VecN}
+computeControlPoints k =
     let
         n = 
             (Array.length k) - 1
@@ -62,7 +61,7 @@ computeControlPoints k size =
 
         p2'' = setAt (n-1) (0.5 * ((gk n) + (getAt (n-1) p1))) p2'
 
-    in Debug.log "p1p2" {p1 = p1, p2 = p2'' }
+    in {p1 = p1, p2 = p2'' }
 
 solve : Array Float -> Array Float -> Array Float -> Array Float -> Array Float
 solve a b c r =
@@ -77,22 +76,19 @@ solve a b c r =
             p' = setAt (n-1) ((getAt (n-1) r'') / (getAt (n-1) b'')) p
         in List.foldl (\i p'' -> setAt i ((getAt i r'' - (getAt i c) * (getAt (i+1) p'')) / (getAt i b'')) p'') p' (List.reverse [0..(n-2)])
 
-splines : Vec2->List Vec2 -> List String
-splines size points =
-    let xx = Debug.log "size" size
+splines : List Vec2 -> List String
+splines points =
+    let 
         xs =
             getXs points
 
         ys =
             getYs points
 
-        px = Debug.log "px" <| computeControlPoints xs (getX size)
+        px = computeControlPoints xs
 
-        py = Debug.log "py" <| 
-            computeControlPoints ys (getY size)
+        py = computeControlPoints ys 
 
-        fst = List.head points
-        lst = List.drop (List.length points - 1) points
     in
          List.map (toPath xs ys px py) [0..(List.length points - 2)] 
 
