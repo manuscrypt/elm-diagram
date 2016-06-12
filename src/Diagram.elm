@@ -73,7 +73,12 @@ update msg model =
                 ( { model | connections = newConns }, Cmd.map (ModifyConnection id) cx )
 
         Modify id msg ->
-            noFx model
+            case Dict.get id model.symbols of 
+                Nothing -> noFx model
+                Just sym ->
+                    let (sym', eff) = Symbol.update msg sym
+                        updatedSymbols = Dict.update id (\mbSym -> Just sym' ) model.symbols
+                    in ( { model | symbols = updatedSymbols }, Cmd.map (Modify id) eff )
 
         ModifyConnection id msg ->
             noFx model

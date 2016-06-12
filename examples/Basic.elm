@@ -6,7 +6,7 @@ import Html.Attributes as HA
 import Color exposing (Color)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY)
 import Svg exposing (Svg)
-import Util exposing (noFx)
+import Util exposing (noFx,updateOne,updateMany)
 import Diagram exposing (..)
 import Symbol exposing (..)
 import Drag exposing (..)
@@ -93,21 +93,7 @@ init =
             , Cmd.batch [ Cmd.map DiagramMsg dx, Cmd.map DragMsg dragCmd ]
             )
     in
-        updateMany (msgs ++ msgs') m0
-
-
-updateMany : List Msg -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-updateMany msgs modelCmd =
-    List.foldl updateOne modelCmd msgs
-
-
-updateOne : Msg -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-updateOne msg ( model, effect ) =
-    let
-        ( next, nextEffect ) =
-            update msg model
-    in
-        next ! [ effect, nextEffect ]
+        updateMany (msgs ++ msgs') update m0
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -124,8 +110,7 @@ update msg model =
                 update (DiagramMsg msg) model
 
         DiagramMsg msg ->
-            let
-                ( d, fx ) =
+            let ( d, fx ) =
                     Diagram.update msg model.diagram
             in
                 ( { model | diagram = d }, Cmd.map DiagramMsg fx )
