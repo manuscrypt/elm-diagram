@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html><head><meta charset="UTF-8"><title>Diagram</title><style>html,head,body { padding:0; margin:0; }
+<html><head><meta charset="UTF-8"><title>Main</title><style>html,head,body { padding:0; margin:0; }
 body { font-family: calibri, helvetica, arial, sans-serif; }</style><script type="text/javascript">
 (function() {
 'use strict';
@@ -7248,6 +7248,26 @@ var _elm_community$elm_linear_algebra$Math_Vector2$getY = _elm_community$elm_lin
 var _elm_community$elm_linear_algebra$Math_Vector2$getX = _elm_community$elm_linear_algebra$Native_Math_Vector2.getX;
 var _elm_community$elm_linear_algebra$Math_Vector2$vec2 = _elm_community$elm_linear_algebra$Native_Math_Vector2.vec2;
 var _elm_community$elm_linear_algebra$Math_Vector2$Vec2 = {ctor: 'Vec2'};
+var _ManuScriptHub$elm_diagram$Util$updateOne = F3(
+	function (update, msg, _p0) {
+		var _p1 = _p0;
+		var _p2 = A2(update, msg, _p1._0);
+		var next = _p2._0;
+		var nextEffect = _p2._1;
+		return A2(
+			_elm_lang$core$Platform_Cmd_ops['!'],
+			next,
+			_elm_lang$core$Native_List.fromArray(
+				[_p1._1, nextEffect]));
+	});
+var _ManuScriptHub$elm_diagram$Util$updateMany = F3(
+	function (msgs, update, modelCmd) {
+		return A3(
+			_elm_lang$core$List$foldl,
+			_ManuScriptHub$elm_diagram$Util$updateOne(update),
+			modelCmd,
+			msgs);
+	});
 var _ManuScriptHub$elm_diagram$Util$setAt = F3(
 	function (idx, val, arr) {
 		return A3(_elm_lang$core$Array$set, idx, val, arr);
@@ -7698,19 +7718,21 @@ var _elm_lang$core$Regex$All = {ctor: 'All'};
 var _eskimoblood$elm_color_extra$Color_Convert$xyzToColor = function (_p0) {
 	var _p1 = _p0;
 	var c = function (ch) {
-		return (_elm_lang$core$Native_Utils.cmp(ch, 3.1308e-3) > 0) ? ((1.055 * Math.pow(ch, 1 / 2.4)) - 5.5e-2) : (12.92 * ch);
+		var ch$ = (_elm_lang$core$Native_Utils.cmp(ch, 3.1308e-3) > 0) ? ((1.055 * Math.pow(ch, 1 / 2.4)) - 5.5e-2) : (12.92 * ch);
+		return _elm_lang$core$Basics$round(
+			A3(_elm_lang$core$Basics$clamp, 0, 255, ch$ * 255));
 	};
 	var z$ = _p1.z / 100;
 	var y$ = _p1.y / 100;
 	var x$ = _p1.x / 100;
+	var r = ((x$ * 3.2404542) + (y$ * -1.5371385)) + (z$ * -0.4986);
+	var g = ((x$ * -0.969266) + (y$ * 1.8760108)) + (z$ * 4.1556e-2);
+	var b = ((x$ * 5.56434e-2) + (y$ * -0.2040259)) + (z$ * 1.0572252);
 	return A3(
 		_elm_lang$core$Color$rgb,
-		_elm_lang$core$Basics$round(
-			c(((x$ * 3.2404542) + (y$ * -1.5371385)) + (z$ * -0.4986)) * 255),
-		_elm_lang$core$Basics$round(
-			c(((x$ * -0.969266) + (y$ * 1.8760108)) + (z$ * 4.1556e-2)) * 255),
-		_elm_lang$core$Basics$round(
-			c(((x$ * 5.56434e-2) + (y$ * 0.2040259)) + (z$ * 1.0572252)) * 255));
+		c(r),
+		c(g),
+		c(b));
 };
 var _eskimoblood$elm_color_extra$Color_Convert$labToXyz = function (_p2) {
 	var _p3 = _p2;
@@ -9400,16 +9422,41 @@ var _ManuScriptHub$elm_diagram$Diagram$update = F2(
 						cx)
 				};
 			case 'Modify':
-				return _ManuScriptHub$elm_diagram$Util$noFx(model);
+				var _p7 = _p2._0;
+				var _p5 = A2(_elm_lang$core$Dict$get, _p7, model.symbols);
+				if (_p5.ctor === 'Nothing') {
+					return _ManuScriptHub$elm_diagram$Util$noFx(model);
+				} else {
+					var _p6 = A2(_ManuScriptHub$elm_diagram$Symbol$update, _p2._1, _p5._0);
+					var sym$ = _p6._0;
+					var eff = _p6._1;
+					var updatedSymbols = A3(
+						_elm_lang$core$Dict$update,
+						_p7,
+						function (mbSym) {
+							return _elm_lang$core$Maybe$Just(sym$);
+						},
+						model.symbols);
+					return {
+						ctor: '_Tuple2',
+						_0: _elm_lang$core$Native_Utils.update(
+							model,
+							{symbols: updatedSymbols}),
+						_1: A2(
+							_elm_lang$core$Platform_Cmd$map,
+							_ManuScriptHub$elm_diagram$Diagram$Modify(_p7),
+							eff)
+					};
+				}
 			default:
 				return _ManuScriptHub$elm_diagram$Util$noFx(model);
 		}
 	});
-var _ManuScriptHub$elm_diagram$Diagram$viewSymbol = function (_p5) {
-	var _p6 = _p5;
-	var _p8 = _p6._1;
-	var _p7 = _p6._0;
-	var pos = _p8.pos;
+var _ManuScriptHub$elm_diagram$Diagram$viewSymbol = function (_p8) {
+	var _p9 = _p8;
+	var _p11 = _p9._1;
+	var _p10 = _p9._0;
+	var pos = _p11.pos;
 	return A2(
 		_elm_lang$svg$Svg$g,
 		_elm_lang$core$Native_List.fromArray(
@@ -9418,8 +9465,8 @@ var _ManuScriptHub$elm_diagram$Diagram$viewSymbol = function (_p5) {
 			[
 				A2(
 				_elm_lang$html$Html_App$map,
-				_ManuScriptHub$elm_diagram$Diagram$Modify(_p7),
-				_ManuScriptHub$elm_diagram$Symbol$view(_p8)),
+				_ManuScriptHub$elm_diagram$Diagram$Modify(_p10),
+				_ManuScriptHub$elm_diagram$Symbol$view(_p11)),
 				A2(
 				_elm_lang$svg$Svg$text$,
 				_elm_lang$core$Native_List.fromArray(
@@ -9432,20 +9479,20 @@ var _ManuScriptHub$elm_diagram$Diagram$viewSymbol = function (_p5) {
 				_elm_lang$core$Native_List.fromArray(
 					[
 						_elm_lang$svg$Svg$text(
-						_elm_lang$core$Basics$toString(_p7))
+						_elm_lang$core$Basics$toString(_p10))
 					]))
 			]));
 };
 var _ManuScriptHub$elm_diagram$Diagram$view = function (model) {
-	var _p9 = {
+	var _p12 = {
 		ctor: '_Tuple2',
 		_0: _elm_lang$core$Basics$toString(
 			_elm_community$elm_linear_algebra$Math_Vector2$getX(model.size)),
 		_1: _elm_lang$core$Basics$toString(
 			_elm_community$elm_linear_algebra$Math_Vector2$getY(model.size))
 	};
-	var sw = _p9._0;
-	var sh = _p9._1;
+	var sw = _p12._0;
+	var sh = _p12._1;
 	return A2(
 		_elm_lang$svg$Svg$svg,
 		_elm_lang$core$Native_List.fromArray(
@@ -9493,9 +9540,1080 @@ var _ManuScriptHub$elm_diagram$Diagram$Add = F4(
 	function (a, b, c, d) {
 		return {ctor: 'Add', _0: a, _1: b, _2: c, _3: d};
 	});
+var _elm_lang$dom$Native_Dom = function() {
+
+function on(node)
+{
+	return function(eventName, decoder, toTask)
+	{
+		return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback) {
+
+			function performTask(event)
+			{
+				var result = A2(_elm_lang$core$Json_Decode$decodeValue, decoder, event);
+				if (result.ctor === 'Ok')
+				{
+					_elm_lang$core$Native_Scheduler.rawSpawn(toTask(result._0));
+				}
+			}
+
+			node.addEventListener(eventName, performTask);
+
+			return function()
+			{
+				node.removeEventListener(eventName, performTask);
+			};
+		});
+	};
+}
+
+return {
+	onDocument: F3(on(document)),
+	onWindow: F3(on(window))
+};
+
+}();
+var _elm_lang$dom$Dom_LowLevel$onWindow = _elm_lang$dom$Native_Dom.onWindow;
+var _elm_lang$dom$Dom_LowLevel$onDocument = _elm_lang$dom$Native_Dom.onDocument;
+var _elm_lang$mouse$Mouse$onSelfMsg = F3(
+	function (router, _p0, state) {
+		var _p1 = _p0;
+		var _p2 = A2(_elm_lang$core$Dict$get, _p1.category, state);
+		if (_p2.ctor === 'Nothing') {
+			return _elm_lang$core$Task$succeed(state);
+		} else {
+			var send = function (tagger) {
+				return A2(
+					_elm_lang$core$Platform$sendToApp,
+					router,
+					tagger(_p1.position));
+			};
+			return A2(
+				_elm_lang$core$Task$andThen,
+				_elm_lang$core$Task$sequence(
+					A2(_elm_lang$core$List$map, send, _p2._0.taggers)),
+				function (_p3) {
+					return _elm_lang$core$Task$succeed(state);
+				});
+		}
+	});
+var _elm_lang$mouse$Mouse_ops = _elm_lang$mouse$Mouse_ops || {};
+_elm_lang$mouse$Mouse_ops['&>'] = F2(
+	function (t1, t2) {
+		return A2(
+			_elm_lang$core$Task$andThen,
+			t1,
+			function (_p4) {
+				return t2;
+			});
+	});
+var _elm_lang$mouse$Mouse$init = _elm_lang$core$Task$succeed(_elm_lang$core$Dict$empty);
+var _elm_lang$mouse$Mouse$categorizeHelpHelp = F2(
+	function (value, maybeValues) {
+		var _p5 = maybeValues;
+		if (_p5.ctor === 'Nothing') {
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_List.fromArray(
+					[value]));
+		} else {
+			return _elm_lang$core$Maybe$Just(
+				A2(_elm_lang$core$List_ops['::'], value, _p5._0));
+		}
+	});
+var _elm_lang$mouse$Mouse$categorizeHelp = F2(
+	function (subs, subDict) {
+		categorizeHelp:
+		while (true) {
+			var _p6 = subs;
+			if (_p6.ctor === '[]') {
+				return subDict;
+			} else {
+				var _v4 = _p6._1,
+					_v5 = A3(
+					_elm_lang$core$Dict$update,
+					_p6._0._0,
+					_elm_lang$mouse$Mouse$categorizeHelpHelp(_p6._0._1),
+					subDict);
+				subs = _v4;
+				subDict = _v5;
+				continue categorizeHelp;
+			}
+		}
+	});
+var _elm_lang$mouse$Mouse$categorize = function (subs) {
+	return A2(_elm_lang$mouse$Mouse$categorizeHelp, subs, _elm_lang$core$Dict$empty);
+};
+var _elm_lang$mouse$Mouse$subscription = _elm_lang$core$Native_Platform.leaf('Mouse');
+var _elm_lang$mouse$Mouse$Position = F2(
+	function (a, b) {
+		return {x: a, y: b};
+	});
+var _elm_lang$mouse$Mouse$position = A3(
+	_elm_lang$core$Json_Decode$object2,
+	_elm_lang$mouse$Mouse$Position,
+	A2(_elm_lang$core$Json_Decode_ops[':='], 'pageX', _elm_lang$core$Json_Decode$int),
+	A2(_elm_lang$core$Json_Decode_ops[':='], 'pageY', _elm_lang$core$Json_Decode$int));
+var _elm_lang$mouse$Mouse$Watcher = F2(
+	function (a, b) {
+		return {taggers: a, pid: b};
+	});
+var _elm_lang$mouse$Mouse$Msg = F2(
+	function (a, b) {
+		return {category: a, position: b};
+	});
+var _elm_lang$mouse$Mouse$onEffects = F3(
+	function (router, newSubs, oldState) {
+		var rightStep = F3(
+			function (category, taggers, task) {
+				return A2(
+					_elm_lang$core$Task$andThen,
+					task,
+					function (state) {
+						return A2(
+							_elm_lang$core$Task$andThen,
+							_elm_lang$core$Process$spawn(
+								A3(
+									_elm_lang$dom$Dom_LowLevel$onDocument,
+									category,
+									_elm_lang$mouse$Mouse$position,
+									function (_p7) {
+										return A2(
+											_elm_lang$core$Platform$sendToSelf,
+											router,
+											A2(_elm_lang$mouse$Mouse$Msg, category, _p7));
+									})),
+							function (pid) {
+								return _elm_lang$core$Task$succeed(
+									A3(
+										_elm_lang$core$Dict$insert,
+										category,
+										A2(_elm_lang$mouse$Mouse$Watcher, taggers, pid),
+										state));
+							});
+					});
+			});
+		var bothStep = F4(
+			function (category, _p8, taggers, task) {
+				var _p9 = _p8;
+				return A2(
+					_elm_lang$core$Task$andThen,
+					task,
+					function (state) {
+						return _elm_lang$core$Task$succeed(
+							A3(
+								_elm_lang$core$Dict$insert,
+								category,
+								A2(_elm_lang$mouse$Mouse$Watcher, taggers, _p9.pid),
+								state));
+					});
+			});
+		var leftStep = F3(
+			function (category, _p10, task) {
+				var _p11 = _p10;
+				return A2(
+					_elm_lang$mouse$Mouse_ops['&>'],
+					_elm_lang$core$Process$kill(_p11.pid),
+					task);
+			});
+		return A6(
+			_elm_lang$core$Dict$merge,
+			leftStep,
+			bothStep,
+			rightStep,
+			oldState,
+			_elm_lang$mouse$Mouse$categorize(newSubs),
+			_elm_lang$core$Task$succeed(_elm_lang$core$Dict$empty));
+	});
+var _elm_lang$mouse$Mouse$MySub = F2(
+	function (a, b) {
+		return {ctor: 'MySub', _0: a, _1: b};
+	});
+var _elm_lang$mouse$Mouse$clicks = function (tagger) {
+	return _elm_lang$mouse$Mouse$subscription(
+		A2(_elm_lang$mouse$Mouse$MySub, 'click', tagger));
+};
+var _elm_lang$mouse$Mouse$moves = function (tagger) {
+	return _elm_lang$mouse$Mouse$subscription(
+		A2(_elm_lang$mouse$Mouse$MySub, 'mousemove', tagger));
+};
+var _elm_lang$mouse$Mouse$downs = function (tagger) {
+	return _elm_lang$mouse$Mouse$subscription(
+		A2(_elm_lang$mouse$Mouse$MySub, 'mousedown', tagger));
+};
+var _elm_lang$mouse$Mouse$ups = function (tagger) {
+	return _elm_lang$mouse$Mouse$subscription(
+		A2(_elm_lang$mouse$Mouse$MySub, 'mouseup', tagger));
+};
+var _elm_lang$mouse$Mouse$subMap = F2(
+	function (func, _p12) {
+		var _p13 = _p12;
+		return A2(
+			_elm_lang$mouse$Mouse$MySub,
+			_p13._0,
+			function (_p14) {
+				return func(
+					_p13._1(_p14));
+			});
+	});
+_elm_lang$core$Native_Platform.effectManagers['Mouse'] = {pkg: 'elm-lang/mouse', init: _elm_lang$mouse$Mouse$init, onEffects: _elm_lang$mouse$Mouse$onEffects, onSelfMsg: _elm_lang$mouse$Mouse$onSelfMsg, tag: 'sub', subMap: _elm_lang$mouse$Mouse$subMap};
+var _ManuScriptHub$elm_diagram$Drag$calculateOffsetWithinBounds = F4(
+	function (_p0, startOffset, containerSize, elementSize) {
+		var _p1 = _p0;
+		var _p2 = _p1.dragState;
+		if (_p2.ctor === 'Just') {
+			var dy = _p1.mousePosition.y - _p2._0.startPosition.y;
+			var diffY = _elm_lang$core$Basics$toFloat(dy) / _elm_lang$core$Basics$toFloat(containerSize);
+			var offset$ = startOffset + diffY;
+			return A2(
+				_elm_lang$core$Basics$max,
+				0,
+				A2(_elm_lang$core$Basics$min, 1 - elementSize, offset$));
+		} else {
+			return 0;
+		}
+	});
+var _ManuScriptHub$elm_diagram$Drag$updateItem = F2(
+	function (model, item) {
+		var dragState$ = A2(
+			_elm_lang$core$Maybe$map,
+			function (dragState) {
+				return _elm_lang$core$Native_Utils.update(
+					dragState,
+					{item: item});
+			},
+			model.dragState);
+		return _elm_lang$core$Native_Utils.update(
+			model,
+			{dragState: dragState$});
+	});
+var _ManuScriptHub$elm_diagram$Drag$draggedItem = function (model) {
+	return A2(
+		_elm_lang$core$Maybe$map,
+		function (_) {
+			return _.item;
+		},
+		model.dragState);
+};
+var _ManuScriptHub$elm_diagram$Drag$Model = F2(
+	function (a, b) {
+		return {dragState: a, mousePosition: b};
+	});
+var _ManuScriptHub$elm_diagram$Drag$init = {
+	ctor: '_Tuple2',
+	_0: A2(
+		_ManuScriptHub$elm_diagram$Drag$Model,
+		_elm_lang$core$Maybe$Nothing,
+		A2(_elm_lang$mouse$Mouse$Position, 0, 0)),
+	_1: _elm_lang$core$Platform_Cmd$none
+};
+var _ManuScriptHub$elm_diagram$Drag$DragEnd = {ctor: 'DragEnd'};
+var _ManuScriptHub$elm_diagram$Drag$Move = function (a) {
+	return {ctor: 'Move', _0: a};
+};
+var _ManuScriptHub$elm_diagram$Drag$subscriptions = function (model) {
+	var ups = A2(
+		_elm_lang$core$Maybe$withDefault,
+		_elm_lang$core$Platform_Sub$none,
+		A2(
+			_elm_lang$core$Maybe$map,
+			_elm_lang$core$Basics$always(
+				_elm_lang$mouse$Mouse$ups(
+					_elm_lang$core$Basics$always(_ManuScriptHub$elm_diagram$Drag$DragEnd))),
+			model.dragState));
+	return _elm_lang$core$Platform_Sub$batch(
+		_elm_lang$core$Native_List.fromArray(
+			[
+				ups,
+				_elm_lang$mouse$Mouse$moves(_ManuScriptHub$elm_diagram$Drag$Move)
+			]));
+};
+var _ManuScriptHub$elm_diagram$Drag$DragStart = function (a) {
+	return {ctor: 'DragStart', _0: a};
+};
+var _ManuScriptHub$elm_diagram$Drag$start = F2(
+	function (tagger, item) {
+		return tagger(
+			_ManuScriptHub$elm_diagram$Drag$DragStart(item));
+	});
+var _ManuScriptHub$elm_diagram$Drag$OnDragEnd = {ctor: 'OnDragEnd'};
+var _ManuScriptHub$elm_diagram$Drag$OnMove = F2(
+	function (a, b) {
+		return {ctor: 'OnMove', _0: a, _1: b};
+	});
+var _ManuScriptHub$elm_diagram$Drag$OnDragStart = {ctor: 'OnDragStart'};
+var _ManuScriptHub$elm_diagram$Drag$NoOp = {ctor: 'NoOp'};
+var _ManuScriptHub$elm_diagram$Drag$update = F2(
+	function (msg, model) {
+		var _p3 = msg;
+		switch (_p3.ctor) {
+			case 'DragStart':
+				var dragState = _elm_lang$core$Maybe$Just(
+					{item: _p3._0, startPosition: model.mousePosition});
+				return {
+					ctor: '_Tuple3',
+					_0: _elm_lang$core$Native_Utils.update(
+						model,
+						{dragState: dragState}),
+					_1: _elm_lang$core$Platform_Cmd$none,
+					_2: _ManuScriptHub$elm_diagram$Drag$OnDragStart
+				};
+			case 'Move':
+				var _p5 = _p3._0;
+				var event = function () {
+					var _p4 = model.dragState;
+					if (_p4.ctor === 'Just') {
+						return A2(_ManuScriptHub$elm_diagram$Drag$OnMove, _p5, _p4._0.item);
+					} else {
+						return _ManuScriptHub$elm_diagram$Drag$NoOp;
+					}
+				}();
+				return {
+					ctor: '_Tuple3',
+					_0: _elm_lang$core$Native_Utils.update(
+						model,
+						{mousePosition: _p5}),
+					_1: _elm_lang$core$Platform_Cmd$none,
+					_2: event
+				};
+			default:
+				return {
+					ctor: '_Tuple3',
+					_0: _elm_lang$core$Native_Utils.update(
+						model,
+						{dragState: _elm_lang$core$Maybe$Nothing}),
+					_1: _elm_lang$core$Platform_Cmd$none,
+					_2: _ManuScriptHub$elm_diagram$Drag$OnDragEnd
+				};
+		}
+	});
+var _ManuScriptHub$elm_diagram$Event$view = function (model) {
+	return A2(
+		_elm_lang$html$Html$div,
+		_elm_lang$core$Native_List.fromArray(
+			[]),
+		_elm_lang$core$Native_List.fromArray(
+			[
+				_elm_lang$html$Html$text(model.name)
+			]));
+};
+var _ManuScriptHub$elm_diagram$Event$ord = function (_) {
+	return _.id;
+};
+var _ManuScriptHub$elm_diagram$Event$Model = F5(
+	function (a, b, c, d, e) {
+		return {id: a, name: b, day: c, offset: d, amount: e};
+	});
+var _elm_lang$html$Html_Attributes$attribute = _elm_lang$virtual_dom$VirtualDom$attribute;
+var _elm_lang$html$Html_Attributes$contextmenu = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$attribute, 'contextmenu', value);
+};
+var _elm_lang$html$Html_Attributes$property = _elm_lang$virtual_dom$VirtualDom$property;
+var _elm_lang$html$Html_Attributes$stringProperty = F2(
+	function (name, string) {
+		return A2(
+			_elm_lang$html$Html_Attributes$property,
+			name,
+			_elm_lang$core$Json_Encode$string(string));
+	});
+var _elm_lang$html$Html_Attributes$class = function (name) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'className', name);
+};
+var _elm_lang$html$Html_Attributes$id = function (name) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'id', name);
+};
+var _elm_lang$html$Html_Attributes$title = function (name) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'title', name);
+};
+var _elm_lang$html$Html_Attributes$accesskey = function ($char) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'accessKey',
+		_elm_lang$core$String$fromChar($char));
+};
+var _elm_lang$html$Html_Attributes$dir = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'dir', value);
+};
+var _elm_lang$html$Html_Attributes$draggable = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'draggable', value);
+};
+var _elm_lang$html$Html_Attributes$dropzone = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'dropzone', value);
+};
+var _elm_lang$html$Html_Attributes$itemprop = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'itemprop', value);
+};
+var _elm_lang$html$Html_Attributes$lang = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'lang', value);
+};
+var _elm_lang$html$Html_Attributes$tabindex = function (n) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'tabIndex',
+		_elm_lang$core$Basics$toString(n));
+};
+var _elm_lang$html$Html_Attributes$charset = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'charset', value);
+};
+var _elm_lang$html$Html_Attributes$content = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'content', value);
+};
+var _elm_lang$html$Html_Attributes$httpEquiv = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'httpEquiv', value);
+};
+var _elm_lang$html$Html_Attributes$language = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'language', value);
+};
+var _elm_lang$html$Html_Attributes$src = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'src', value);
+};
+var _elm_lang$html$Html_Attributes$height = function (value) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'height',
+		_elm_lang$core$Basics$toString(value));
+};
+var _elm_lang$html$Html_Attributes$width = function (value) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'width',
+		_elm_lang$core$Basics$toString(value));
+};
+var _elm_lang$html$Html_Attributes$alt = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'alt', value);
+};
+var _elm_lang$html$Html_Attributes$preload = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'preload', value);
+};
+var _elm_lang$html$Html_Attributes$poster = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'poster', value);
+};
+var _elm_lang$html$Html_Attributes$kind = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'kind', value);
+};
+var _elm_lang$html$Html_Attributes$srclang = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'srclang', value);
+};
+var _elm_lang$html$Html_Attributes$sandbox = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'sandbox', value);
+};
+var _elm_lang$html$Html_Attributes$srcdoc = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'srcdoc', value);
+};
+var _elm_lang$html$Html_Attributes$type$ = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'type', value);
+};
+var _elm_lang$html$Html_Attributes$value = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'value', value);
+};
+var _elm_lang$html$Html_Attributes$defaultValue = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'defaultValue', value);
+};
+var _elm_lang$html$Html_Attributes$placeholder = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'placeholder', value);
+};
+var _elm_lang$html$Html_Attributes$accept = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'accept', value);
+};
+var _elm_lang$html$Html_Attributes$acceptCharset = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'acceptCharset', value);
+};
+var _elm_lang$html$Html_Attributes$action = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'action', value);
+};
+var _elm_lang$html$Html_Attributes$autocomplete = function (bool) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'autocomplete',
+		bool ? 'on' : 'off');
+};
+var _elm_lang$html$Html_Attributes$autosave = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'autosave', value);
+};
+var _elm_lang$html$Html_Attributes$enctype = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'enctype', value);
+};
+var _elm_lang$html$Html_Attributes$formaction = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'formAction', value);
+};
+var _elm_lang$html$Html_Attributes$list = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'list', value);
+};
+var _elm_lang$html$Html_Attributes$minlength = function (n) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'minLength',
+		_elm_lang$core$Basics$toString(n));
+};
+var _elm_lang$html$Html_Attributes$maxlength = function (n) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'maxLength',
+		_elm_lang$core$Basics$toString(n));
+};
+var _elm_lang$html$Html_Attributes$method = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'method', value);
+};
+var _elm_lang$html$Html_Attributes$name = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'name', value);
+};
+var _elm_lang$html$Html_Attributes$pattern = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'pattern', value);
+};
+var _elm_lang$html$Html_Attributes$size = function (n) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'size',
+		_elm_lang$core$Basics$toString(n));
+};
+var _elm_lang$html$Html_Attributes$for = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'htmlFor', value);
+};
+var _elm_lang$html$Html_Attributes$form = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'form', value);
+};
+var _elm_lang$html$Html_Attributes$max = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'max', value);
+};
+var _elm_lang$html$Html_Attributes$min = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'min', value);
+};
+var _elm_lang$html$Html_Attributes$step = function (n) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'step', n);
+};
+var _elm_lang$html$Html_Attributes$cols = function (n) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'cols',
+		_elm_lang$core$Basics$toString(n));
+};
+var _elm_lang$html$Html_Attributes$rows = function (n) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'rows',
+		_elm_lang$core$Basics$toString(n));
+};
+var _elm_lang$html$Html_Attributes$wrap = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'wrap', value);
+};
+var _elm_lang$html$Html_Attributes$usemap = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'useMap', value);
+};
+var _elm_lang$html$Html_Attributes$shape = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'shape', value);
+};
+var _elm_lang$html$Html_Attributes$coords = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'coords', value);
+};
+var _elm_lang$html$Html_Attributes$challenge = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'challenge', value);
+};
+var _elm_lang$html$Html_Attributes$keytype = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'keytype', value);
+};
+var _elm_lang$html$Html_Attributes$align = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'align', value);
+};
+var _elm_lang$html$Html_Attributes$cite = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'cite', value);
+};
+var _elm_lang$html$Html_Attributes$href = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'href', value);
+};
+var _elm_lang$html$Html_Attributes$target = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'target', value);
+};
+var _elm_lang$html$Html_Attributes$downloadAs = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'download', value);
+};
+var _elm_lang$html$Html_Attributes$hreflang = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'hreflang', value);
+};
+var _elm_lang$html$Html_Attributes$media = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'media', value);
+};
+var _elm_lang$html$Html_Attributes$ping = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'ping', value);
+};
+var _elm_lang$html$Html_Attributes$rel = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'rel', value);
+};
+var _elm_lang$html$Html_Attributes$datetime = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'datetime', value);
+};
+var _elm_lang$html$Html_Attributes$pubdate = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'pubdate', value);
+};
+var _elm_lang$html$Html_Attributes$start = function (n) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'start',
+		_elm_lang$core$Basics$toString(n));
+};
+var _elm_lang$html$Html_Attributes$colspan = function (n) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'colSpan',
+		_elm_lang$core$Basics$toString(n));
+};
+var _elm_lang$html$Html_Attributes$headers = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'headers', value);
+};
+var _elm_lang$html$Html_Attributes$rowspan = function (n) {
+	return A2(
+		_elm_lang$html$Html_Attributes$stringProperty,
+		'rowSpan',
+		_elm_lang$core$Basics$toString(n));
+};
+var _elm_lang$html$Html_Attributes$scope = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'scope', value);
+};
+var _elm_lang$html$Html_Attributes$manifest = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'manifest', value);
+};
+var _elm_lang$html$Html_Attributes$boolProperty = F2(
+	function (name, bool) {
+		return A2(
+			_elm_lang$html$Html_Attributes$property,
+			name,
+			_elm_lang$core$Json_Encode$bool(bool));
+	});
+var _elm_lang$html$Html_Attributes$hidden = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'hidden', bool);
+};
+var _elm_lang$html$Html_Attributes$contenteditable = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'contentEditable', bool);
+};
+var _elm_lang$html$Html_Attributes$spellcheck = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'spellcheck', bool);
+};
+var _elm_lang$html$Html_Attributes$async = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'async', bool);
+};
+var _elm_lang$html$Html_Attributes$defer = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'defer', bool);
+};
+var _elm_lang$html$Html_Attributes$scoped = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'scoped', bool);
+};
+var _elm_lang$html$Html_Attributes$autoplay = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'autoplay', bool);
+};
+var _elm_lang$html$Html_Attributes$controls = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'controls', bool);
+};
+var _elm_lang$html$Html_Attributes$loop = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'loop', bool);
+};
+var _elm_lang$html$Html_Attributes$default = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'default', bool);
+};
+var _elm_lang$html$Html_Attributes$seamless = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'seamless', bool);
+};
+var _elm_lang$html$Html_Attributes$checked = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'checked', bool);
+};
+var _elm_lang$html$Html_Attributes$selected = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'selected', bool);
+};
+var _elm_lang$html$Html_Attributes$autofocus = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'autofocus', bool);
+};
+var _elm_lang$html$Html_Attributes$disabled = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'disabled', bool);
+};
+var _elm_lang$html$Html_Attributes$multiple = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'multiple', bool);
+};
+var _elm_lang$html$Html_Attributes$novalidate = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'noValidate', bool);
+};
+var _elm_lang$html$Html_Attributes$readonly = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'readOnly', bool);
+};
+var _elm_lang$html$Html_Attributes$required = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'required', bool);
+};
+var _elm_lang$html$Html_Attributes$ismap = function (value) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'isMap', value);
+};
+var _elm_lang$html$Html_Attributes$download = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'download', bool);
+};
+var _elm_lang$html$Html_Attributes$reversed = function (bool) {
+	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'reversed', bool);
+};
+var _elm_lang$html$Html_Attributes$classList = function (list) {
+	return _elm_lang$html$Html_Attributes$class(
+		A2(
+			_elm_lang$core$String$join,
+			' ',
+			A2(
+				_elm_lang$core$List$map,
+				_elm_lang$core$Basics$fst,
+				A2(_elm_lang$core$List$filter, _elm_lang$core$Basics$snd, list))));
+};
+var _elm_lang$html$Html_Attributes$style = _elm_lang$virtual_dom$VirtualDom$style;
+var _ManuScriptHub$elm_diagram$Main$bodyStyle = _elm_lang$html$Html_Attributes$style(
+	_elm_lang$core$Native_List.fromArray(
+		[
+			A2(
+			F2(
+				function (v0, v1) {
+					return {ctor: '_Tuple2', _0: v0, _1: v1};
+				}),
+			'width',
+			'920px'),
+			A2(
+			F2(
+				function (v0, v1) {
+					return {ctor: '_Tuple2', _0: v0, _1: v1};
+				}),
+			'margin',
+			'auto'),
+			A2(
+			F2(
+				function (v0, v1) {
+					return {ctor: '_Tuple2', _0: v0, _1: v1};
+				}),
+			'border',
+			'1px solid black'),
+			A2(
+			F2(
+				function (v0, v1) {
+					return {ctor: '_Tuple2', _0: v0, _1: v1};
+				}),
+			'background-color',
+			'#EEEEEE')
+		]));
+var _ManuScriptHub$elm_diagram$Main$template = A2(
+	_elm_lang$html$Html$img,
+	_elm_lang$core$Native_List.fromArray(
+		[
+			_elm_lang$html$Html_Attributes$style(
+			_elm_lang$core$Native_List.fromArray(
+				[
+					A2(
+					F2(
+						function (v0, v1) {
+							return {ctor: '_Tuple2', _0: v0, _1: v1};
+						}),
+					'position',
+					'absolute'),
+					A2(
+					F2(
+						function (v0, v1) {
+							return {ctor: '_Tuple2', _0: v0, _1: v1};
+						}),
+					'top',
+					'-10px'),
+					A2(
+					F2(
+						function (v0, v1) {
+							return {ctor: '_Tuple2', _0: v0, _1: v1};
+						}),
+					'left',
+					'-10px'),
+					A2(
+					F2(
+						function (v0, v1) {
+							return {ctor: '_Tuple2', _0: v0, _1: v1};
+						}),
+					'border',
+					'1px solid black'),
+					A2(
+					F2(
+						function (v0, v1) {
+							return {ctor: '_Tuple2', _0: v0, _1: v1};
+						}),
+					'opacity',
+					'0.1'),
+					A2(
+					F2(
+						function (v0, v1) {
+							return {ctor: '_Tuple2', _0: v0, _1: v1};
+						}),
+					'z-index',
+					'2')
+				]))
+		]),
+	_elm_lang$core$Native_List.fromArray(
+		[]));
+var _ManuScriptHub$elm_diagram$Main$onDragEvent = F2(
+	function (event, model) {
+		var _p0 = event;
+		if (_p0.ctor === 'OnMove') {
+			var _p1 = _p0._1;
+			var offset$ = A4(
+				_ManuScriptHub$elm_diagram$Drag$calculateOffsetWithinBounds,
+				model.drag,
+				_p1.offset,
+				_elm_lang$core$Basics$round(
+					_elm_community$elm_linear_algebra$Math_Vector2$getY(model.diagram.size)),
+				_p1.amount);
+			var event$ = _elm_lang$core$Native_Utils.update(
+				_p1,
+				{offset: offset$});
+			return A2(
+				_elm_lang$core$Platform_Cmd_ops['!'],
+				model,
+				_elm_lang$core$Native_List.fromArray(
+					[]));
+		} else {
+			return A2(
+				_elm_lang$core$Platform_Cmd_ops['!'],
+				model,
+				_elm_lang$core$Native_List.fromArray(
+					[]));
+		}
+	});
+var _ManuScriptHub$elm_diagram$Main$toVec = function (_p2) {
+	var _p3 = _p2;
+	return A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, _p3._0, _p3._1);
+};
+var _ManuScriptHub$elm_diagram$Main$sampleCons2 = _elm_lang$core$Native_List.fromArray(
+	[
+		_elm_lang$core$Native_List.fromArray(
+		[0, 3, 4, 6]),
+		_elm_lang$core$Native_List.fromArray(
+		[1, 3, 5, 7]),
+		_elm_lang$core$Native_List.fromArray(
+		[2, 5, 8])
+	]);
+var _ManuScriptHub$elm_diagram$Main$sampleCons = _elm_lang$core$Native_List.fromArray(
+	[
+		_elm_lang$core$Native_List.fromArray(
+		[0, 1, 2, 3, 4, 5, 6, 7, 8])
+	]);
+var _ManuScriptHub$elm_diagram$Main_ops = _ManuScriptHub$elm_diagram$Main_ops || {};
+_ManuScriptHub$elm_diagram$Main_ops['=>'] = F2(
+	function (v0, v1) {
+		return {ctor: '_Tuple2', _0: v0, _1: v1};
+	});
+var _ManuScriptHub$elm_diagram$Main$sample = _elm_lang$core$Native_List.fromArray(
+	[
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 70, 50),
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 210, 50),
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 350, 50),
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 130, 150),
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 70, 250),
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 270, 250),
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 50, 350),
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 190, 350),
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 330, 350)
+	]);
+var _ManuScriptHub$elm_diagram$Main$sample2 = _elm_lang$core$Native_List.fromArray(
+	[
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 60, 60),
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 220, 300),
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 420, 300),
+		A2(_ManuScriptHub$elm_diagram$Main_ops['=>'], 700, 240)
+	]);
+var _ManuScriptHub$elm_diagram$Main$Model = F2(
+	function (a, b) {
+		return {diagram: a, drag: b};
+	});
+var _ManuScriptHub$elm_diagram$Main$DragMsg = function (a) {
+	return {ctor: 'DragMsg', _0: a};
+};
+var _ManuScriptHub$elm_diagram$Main$DiagramMsg = function (a) {
+	return {ctor: 'DiagramMsg', _0: a};
+};
+var _ManuScriptHub$elm_diagram$Main$update = F2(
+	function (msg, model) {
+		update:
+		while (true) {
+			var _p4 = msg;
+			switch (_p4.ctor) {
+				case 'NoOp':
+					return _ManuScriptHub$elm_diagram$Util$noFx(model);
+				case 'AddBall':
+					var msg = A4(
+						_ManuScriptHub$elm_diagram$Diagram$Add,
+						_ManuScriptHub$elm_diagram$Symbol$Circle,
+						_elm_lang$core$Color$white,
+						A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 20, 20),
+						_p4._0);
+					var _v3 = _ManuScriptHub$elm_diagram$Main$DiagramMsg(msg),
+						_v4 = model;
+					msg = _v3;
+					model = _v4;
+					continue update;
+				case 'DiagramMsg':
+					var _p5 = A2(_ManuScriptHub$elm_diagram$Diagram$update, _p4._0, model.diagram);
+					var d = _p5._0;
+					var fx = _p5._1;
+					return {
+						ctor: '_Tuple2',
+						_0: _elm_lang$core$Native_Utils.update(
+							model,
+							{diagram: d}),
+						_1: A2(_elm_lang$core$Platform_Cmd$map, _ManuScriptHub$elm_diagram$Main$DiagramMsg, fx)
+					};
+				default:
+					var _p6 = A2(_ManuScriptHub$elm_diagram$Drag$update, _p4._0, model.drag);
+					var drag$ = _p6._0;
+					var cmd$ = _p6._1;
+					var event = _p6._2;
+					var model$ = _elm_lang$core$Native_Utils.update(
+						model,
+						{drag: drag$});
+					var _p7 = A2(_ManuScriptHub$elm_diagram$Main$onDragEvent, event, model$);
+					var model$$ = _p7._0;
+					var cmd$$ = _p7._1;
+					return {
+						ctor: '_Tuple2',
+						_0: model$$,
+						_1: _elm_lang$core$Platform_Cmd$batch(
+							_elm_lang$core$Native_List.fromArray(
+								[
+									A2(_elm_lang$core$Platform_Cmd$map, _ManuScriptHub$elm_diagram$Main$DragMsg, cmd$),
+									cmd$$
+								]))
+					};
+			}
+		}
+	});
+var _ManuScriptHub$elm_diagram$Main$diagram = function (model) {
+	return A2(
+		_elm_lang$html$Html$div,
+		_elm_lang$core$Native_List.fromArray(
+			[
+				_elm_lang$html$Html_Attributes$style(
+				_elm_lang$core$Native_List.fromArray(
+					[
+						A2(
+						F2(
+							function (v0, v1) {
+								return {ctor: '_Tuple2', _0: v0, _1: v1};
+							}),
+						'z-index',
+						'1'),
+						A2(
+						F2(
+							function (v0, v1) {
+								return {ctor: '_Tuple2', _0: v0, _1: v1};
+							}),
+						'opacity',
+						'1')
+					]))
+			]),
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(
+				_elm_lang$html$Html_App$map,
+				_ManuScriptHub$elm_diagram$Main$DiagramMsg,
+				_ManuScriptHub$elm_diagram$Diagram$view(model.diagram))
+			]));
+};
+var _ManuScriptHub$elm_diagram$Main$view = function (model) {
+	return A2(
+		_elm_lang$html$Html$div,
+		_elm_lang$core$Native_List.fromArray(
+			[_ManuScriptHub$elm_diagram$Main$bodyStyle]),
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_ManuScriptHub$elm_diagram$Main$diagram(model),
+						_ManuScriptHub$elm_diagram$Main$template
+					])),
+				A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$style(
+						_elm_lang$core$Native_List.fromArray(
+							[
+								A2(
+								F2(
+									function (v0, v1) {
+										return {ctor: '_Tuple2', _0: v0, _1: v1};
+									}),
+								'clear',
+								'both'),
+								A2(
+								F2(
+									function (v0, v1) {
+										return {ctor: '_Tuple2', _0: v0, _1: v1};
+									}),
+								'position',
+								'relative')
+							]))
+					]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html$text(
+						_elm_lang$core$Basics$toString(model))
+					]))
+			]));
+};
+var _ManuScriptHub$elm_diagram$Main$subscriptions = function (model) {
+	return _elm_lang$core$Platform_Sub$batch(
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(
+				_elm_lang$core$Platform_Sub$map,
+				_ManuScriptHub$elm_diagram$Main$DragMsg,
+				_ManuScriptHub$elm_diagram$Drag$subscriptions(model.drag)),
+				A2(
+				_elm_lang$core$Platform_Sub$map,
+				_ManuScriptHub$elm_diagram$Main$DiagramMsg,
+				_ManuScriptHub$elm_diagram$Diagram$subscriptions(model.diagram))
+			]));
+};
+var _ManuScriptHub$elm_diagram$Main$AddBall = function (a) {
+	return {ctor: 'AddBall', _0: a};
+};
+var _ManuScriptHub$elm_diagram$Main$init = function () {
+	var _p8 = _ManuScriptHub$elm_diagram$Drag$init;
+	var drag = _p8._0;
+	var dragCmd = _p8._1;
+	var _p9 = _ManuScriptHub$elm_diagram$Diagram$init;
+	var d = _p9._0;
+	var dx = _p9._1;
+	var m0 = {
+		ctor: '_Tuple2',
+		_0: {diagram: d, drag: drag},
+		_1: _elm_lang$core$Platform_Cmd$batch(
+			_elm_lang$core$Native_List.fromArray(
+				[
+					A2(_elm_lang$core$Platform_Cmd$map, _ManuScriptHub$elm_diagram$Main$DiagramMsg, dx),
+					A2(_elm_lang$core$Platform_Cmd$map, _ManuScriptHub$elm_diagram$Main$DragMsg, dragCmd)
+				]))
+	};
+	var msgs$ = A2(
+		_elm_lang$core$List$map,
+		function (a) {
+			return _ManuScriptHub$elm_diagram$Main$DiagramMsg(
+				_ManuScriptHub$elm_diagram$Diagram$Connect(a));
+		},
+		_ManuScriptHub$elm_diagram$Main$sampleCons2);
+	var msgs = A2(
+		_elm_lang$core$List$map,
+		function (s) {
+			return _ManuScriptHub$elm_diagram$Main$AddBall(
+				_ManuScriptHub$elm_diagram$Main$toVec(s));
+		},
+		_ManuScriptHub$elm_diagram$Main$sample);
+	return A3(
+		_ManuScriptHub$elm_diagram$Util$updateMany,
+		A2(_elm_lang$core$Basics_ops['++'], msgs, msgs$),
+		_ManuScriptHub$elm_diagram$Main$update,
+		m0);
+}();
+var _ManuScriptHub$elm_diagram$Main$main = {
+	main: _elm_lang$html$Html_App$program(
+		{init: _ManuScriptHub$elm_diagram$Main$init, view: _ManuScriptHub$elm_diagram$Main$view, update: _ManuScriptHub$elm_diagram$Main$update, subscriptions: _ManuScriptHub$elm_diagram$Main$subscriptions})
+};
+var _ManuScriptHub$elm_diagram$Main$NoOp = {ctor: 'NoOp'};
 var Elm = {};
-Elm['Diagram'] = Elm['Diagram'] || {};
-_elm_lang$core$Native_Platform.addPublicModule(Elm['Diagram'], 'Diagram', typeof _ManuScriptHub$elm_diagram$Diagram$main === 'undefined' ? null : _ManuScriptHub$elm_diagram$Diagram$main);
+Elm['Main'] = Elm['Main'] || {};
+_elm_lang$core$Native_Platform.addPublicModule(Elm['Main'], 'Main', typeof _ManuScriptHub$elm_diagram$Main$main === 'undefined' ? null : _ManuScriptHub$elm_diagram$Main$main);
 
 if (typeof define === "function" && define['amd'])
 {
@@ -9526,4 +10644,4 @@ for (var publicModule in Elm)
 }
 
 }).call(this);
-</script></head><body><script type="text/javascript">Elm.Diagram.fullscreen()</script></body></html>
+</script></head><body><script type="text/javascript">Elm.Main.fullscreen()</script></body></html>
