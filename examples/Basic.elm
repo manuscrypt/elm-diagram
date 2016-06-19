@@ -4,25 +4,25 @@ import Html
 import Html.App as App
 import Html.Attributes as HA
 import Color exposing (Color)
-import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY)
+import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY, sub)
 import Svg exposing (Svg)
-import Util exposing (noFx,updateOne,updateMany)
-
+import Util exposing (noFx, updateOne, updateMany)
 import Diagram exposing (..)
-import Drag exposing (..)
-import Event exposing (..)
+import Symbol
+import Event
+import Drag
 
 
 type alias Model =
     { diagram : Diagram.Model
-    , drag : Drag.Model Event.Model
+    , drag : Drag.Model Symbol.Model
     }
 
 
 type Msg
     = NoOp
     | DiagramMsg Diagram.Msg
-    | DragMsg (Drag.Msg Event.Model)
+    | DragMsg (Drag.Msg Symbol.Model)
 
 
 (=>) =
@@ -54,9 +54,11 @@ sampleCons =
     [ [ 0, 1, 2, 3, 4, 5, 6, 7, 8 ]
     ]
 
+
 sampleCons4 =
     [ [ 0, 1, 2, 8, 7, 6, 4, 3, 5 ]
     ]
+
 
 sampleCons2 =
     [ [ 0, 3, 4, 6 ]
@@ -64,11 +66,13 @@ sampleCons2 =
     , [ 2, 5, 8 ]
     ]
 
-sampleCons3 = 
+
+sampleCons3 =
     [ [ 0, 3, 5, 8 ]
     , [ 1, 3, 4, 6 ]
     , [ 2, 5, 7 ]
     ]
+
 
 toVec : ( Float, Float ) -> Math.Vector2.Vec2
 toVec ( x, y ) =
@@ -82,7 +86,7 @@ init =
             List.map (\s -> DiagramMsg <| AddNode Color.white (vec2 20 20) <| toVec s) sample
 
         msgs' =
-            List.map (\a -> DiagramMsg <| Connect a) (sampleCons4) 
+            List.map (\a -> DiagramMsg <| Connect a) sampleCons4
 
         ( d, dx ) =
             Diagram.init
@@ -107,39 +111,48 @@ update msg model =
             noFx model
 
         DiagramMsg msg ->
-            let ( d, fx ) =
+            let
+                ( d, fx ) =
                     Diagram.update msg model.diagram
             in
                 ( { model | diagram = d }, Cmd.map DiagramMsg fx )
 
         DragMsg msg ->
             let
-                ( drag', cmd', event ) =
-                    Drag.update msg model.drag
+                ( drag', cmd', symbol ) =
+                    Debug.log "x" <| Drag.update msg model.drag
 
                 model' =
                     { model | drag = drag' }
 
                 ( model'', cmd'' ) =
-                    onDragEvent event model'
+                    onDragEvent symbol model'
             in
                 ( model'', Cmd.batch [ Cmd.map DragMsg cmd', cmd'' ] )
 
 
-onDragEvent : Drag.Event Event.Model -> Model -> ( Model, Cmd Msg )
+onDragEvent : Drag.Event Symbol.Model -> Model -> ( Model, Cmd Msg )
 onDragEvent event model =
     case event of
-        Drag.OnMove position event ->
+        -- Drag.OnDragStart ->
+        --     update (DragMsg <| Drag.DragStart event) model
+        Drag.OnMove position symbol ->
             let
-                offset' =
-                    Drag.calculateOffsetWithinBounds model.drag event.offset (round <| getY model.diagram.size) event.amount
+                posVec =
+                    (vec2 (toFloat position.x) (toFloat position.y))
 
-                event' = Debug.log "evt"
-                    { event | offset = offset' }
+                dx =
+                    Debug.log "dragmove" <| sub posVec symbol.pos
+
+                msg =
+                    DiagramMsg <| Modify symbol.id (Symbol.Move posVec)
+
+                --Drag.calculateOffsetWithinBounds model.drag model.pos (round <| getY model.diagram.size) event.amount
             in
-                model ! []
+                update msg model
 
-        _ ->             model ! []
+        _ ->
+            model ! []
 
 
 diagram : Model -> Svg Msg
@@ -174,7 +187,7 @@ view model =
     Html.div [ bodyStyle ]
         [ Html.div []
             [ diagram model
-            --, template
+              --, template
             ]
         , Html.div [ HA.style [ (,) "clear" "both", (,) "position" "relative" ] ] [ Html.text <| toString model ]
         ]
@@ -186,7 +199,7 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = subscriptions
+        , subscriptions = (\_ -> Sub.none)
         }
 
 
@@ -200,18 +213,15 @@ bodyStyle =
         ]
 
 
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.batch
-        [ Sub.map DragMsg <| Drag.subscriptions model.drag
-        , Sub.map DiagramMsg <| Diagram.subscriptions model.diagram
-        ]
 
-
-
-        -- AddBall vec ->
-        --     let
-        --         msg =
-        --             Diagram.AddBall vec
-        --     in
-        --         update (DiagramMsg msg) model
+-- subscriptions : Model -> Sub Msg
+-- subscriptions model =
+--     Sub.batch
+--         [ Sub.map DiagramMsg <| Diagram.subscriptions model.diagram
+--         ]
+-- AddBall vec ->
+--     let
+--         msg =
+--             Diagram.AddBall vec
+--     in
+--         update (DiagramMsg msg) model

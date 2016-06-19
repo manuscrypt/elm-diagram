@@ -49,7 +49,7 @@ update msg model =
                     Dict.size model.symbols
 
                 ( symbol, fx ) =
-                    Symbol.init Symbol.Circle color size pos
+                    Symbol.init newId Symbol.Circle color size pos
 
                 newSym =
                     insert newId symbol model.symbols
@@ -118,8 +118,8 @@ view model =
                 ++ (List.map viewConnection <| Dict.toList model.connections)
             )
 
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.batch
-        ( Dict.values <| Dict.map (\k v -> Sub.map (Modify k) <| Symbol.subscriptions v ) model.symbols
-        )
+-- subscriptions : Model -> Sub Msg
+-- subscriptions model =
+--     Sub.batch
+--         ( Dict.values <| Dict.map (\k v -> Sub.map (Modify k) <| Symbol.subscriptions v ) model.symbols
+--         )

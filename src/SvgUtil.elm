@@ -46,12 +46,13 @@ translate pos =
 
 s:Vec2->String
 s s = toString s
+
 sxy:Vec2->String
 sxy vec = (sx vec) ++ "," ++ (sy vec)
 
-
 sp:Vec2->String
 sp vec = (sx vec) ++ " " ++ (sy vec)
+
 sx:Vec2->String
 sx = toString << getX
 sy:Vec2->String

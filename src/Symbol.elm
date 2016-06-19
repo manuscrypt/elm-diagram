@@ -1,12 +1,13 @@
 module Symbol exposing (..)
 
-import Math.Vector2 as Vec2 exposing (Vec2,vec2,getX, getY)
+import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY)
 import Svg exposing (Svg)
 import Svg.Attributes as SA
+import Svg.Events as SE
 import Util exposing (noFx)
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
-import Time exposing (Time)
+import Drag
 
 
 type Shape
@@ -15,7 +16,8 @@ type Shape
 
 
 type alias Model =
-    { shape : Shape
+    { id : Int
+    , shape : Shape
     , color : Color
     , size : Vec2
     , pos : Vec2
@@ -27,9 +29,11 @@ type Msg
     | SetColor Color
     | Resize Vec2
 
-init : Shape -> Color -> Vec2 -> Vec2 -> ( Model, Cmd Msg )
-init shape color size pos =
-    noFx <| Model shape color size pos
+
+init : Int -> Shape -> Color -> Vec2 -> Vec2 -> ( Model, Cmd Msg )
+init id shape color size pos =
+    noFx <| Model id shape color size pos
+
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -50,7 +54,11 @@ view model =
         content =
             toSvg model
     in
-        Svg.g [ SA.transform <| translate model.pos ] [ content ]
+        Svg.g
+            [ SA.transform <| translate model.pos
+              --, SE.onMouseDown (Drag.start DragMsg Drag.OnDragStart)
+            ]
+            [ content ]
 
 
 toSvg : Model -> Svg Msg
@@ -93,6 +101,17 @@ rect model =
     , ( SA.stroke, "black" )
     ]
 
-move: {a | pos: Vec2 } -> Float ->  {a | pos: Vec2 }
-move model t = 
-    { model | pos = Vec2.add model.pos (Vec2.scale t (vec2 1 1))} 
+
+move : { a | pos : Vec2 } -> Float -> { a | pos : Vec2 }
+move model t =
+    { model | pos = Vec2.add model.pos (Vec2.scale t (vec2 1 1)) }
+
+
+subscriptions model =
+    Sub.none
+
+
+
+-- Sub.batch
+--     [ Sub.map DragMsg <| Drag.subscriptions model.drag
+--     ]

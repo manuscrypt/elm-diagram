@@ -14,10 +14,6 @@ import Color
 import Diagram
 import Symbol
 
-type alias Q = (Int, Int)
-type alias ListQ = List Q
-
-
 type alias StoryEvent a = 
     { t0 : Time 
     , duration: Time
@@ -37,7 +33,7 @@ type Msg
 
 
 init = 
-    let (sym, sfx) = Symbol.init Symbol.Circle Color.red (vec2 20 20) (vec2 50 50)
+    let (sym, sfx) = Symbol.init 0 Symbol.Circle Color.red (vec2 20 20) (vec2 50 50)
         evt = StoryEvent 1000 3000 (\t -> Symbol.SetColor <| if t > 2500 then Color.green else Color.red)
         m0 = { animations = [], symbol = sym }
     in
@@ -110,16 +106,6 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
-
-
-moves : Q -> { list: List ListQ } -> { list: List ListQ }
-moves pos model =
-        case model.list of
-            x::xs ->
-                case x of
-                    p::ps -> { model | list = ([pos,p]++ps)::xs }
-                    [] -> { model | list = (pos::[])::xs }
-            [] -> { model | list = [[pos]] }
 
 -- animation : Animation Color
 -- animation =
