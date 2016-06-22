@@ -16,10 +16,10 @@ type alias Stroke =
   , width : Float
   }
 
-circle : Vec2 -> Float -> Stroke -> VirtualDom.Node a
-circle pos radius stroke =
+circle : Vec2 -> Float -> Stroke -> Color -> VirtualDom.Node a
+circle pos radius stroke fillcolor =
   Svg.circle
-    ( [ SA.cx ( vecXtoString pos ), SA.cy ( vecYtoString pos ), SA.r ( toString radius ), SA.fill "transparent" ]
+    ( [ SA.cx ( vecXtoString pos ), SA.cy ( vecYtoString pos ), SA.r ( toString radius ), SA.fill ( colorToHex fillcolor ) ]
       ++ ( strokeToSA stroke ) )
     []
 
@@ -64,8 +64,8 @@ blueThinStroke = Stroke Color.blue 0.3
 main : Node a
 main =
   Svg.svg [ SA.version "1.1", SA.x "0", SA.y "0", SA.viewBox "0 0 323.141 322.95" ]
-      [ ( circle ( vec2 100 10 ) 5 redThinStroke )
-      , ( circle ( vec2 100 20 ) 15 redStroke )
+      [ ( circle ( vec2 100 10 ) 5 redThinStroke Color.yellow )
+      , ( circle ( vec2 100 20 ) 15 redStroke Color.yellow  )
       , ( bezierLineWithDirection ( vec2 50 40 ) ( vec2 0 0 ) ( vec2 0 0 ) ( vec2 150 40 ) blueThinStroke )
       , ( bezierLineWithDirection ( vec2 50 50 ) ( vec2 0 10 ) ( vec2 0 -10 ) ( vec2 150 50 ) blueThinStroke )
       , ( bezierLineWithDirection ( vec2 150 50 ) ( vec2 0 10 ) ( vec2 0 -10 ) ( vec2 250 50 ) redThinStroke )
