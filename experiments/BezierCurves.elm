@@ -60,7 +60,7 @@ blueThinStroke = SvgUtils.Stroke Color.blue 0.3
 
 pointsAsCircles : List ( VirtualDom.Node a )
 pointsAsCircles  =
-  List.map ( \pos -> ( SvgUtils.circle pos 1 blackStroke ) ) points
+  List.map ( \pos -> ( SvgUtils.circle pos 1 blackStroke Color.darkBlue ) ) points
 
 listLast list = List.head list -- ( List.reverse list )
 
@@ -100,8 +100,8 @@ nextSegment p12345 =
                   let d21 = ( directionTo p1 p2 )
                       d34 = ( directionTo p4 p3 )
               in
-                [ ( SvgUtils.circle ( add p2 d21 ) 1 redThinStroke )
-                , ( SvgUtils.circle ( add p3 d34 ) 1 redThinStroke )
+                [ ( SvgUtils.circle ( add p2 d21 ) 1 redThinStroke Color.yellow )
+                , ( SvgUtils.circle ( add p3 d34 ) 1 redThinStroke Color.darkBlue )
                 , ( SvgUtils.bezierLineWithDirection p2 d21 d34 p3 blueThinStroke )
                 ]
                 ++ ( nextSegment p2345 )
