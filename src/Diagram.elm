@@ -8,9 +8,8 @@ import Symbol
 import Connection
 import Svg exposing (Svg)
 import Svg.Attributes as SA
-import Util exposing (noFx)
-import SvgUtil exposing (sx, sy)
-
+import Extra.Cmd exposing (noFx)
+import Extra.Svg exposing (sx, sy)
 
 --import Ball
 
@@ -73,7 +72,7 @@ update msg model =
                 ( { model | connections = newConns }, Cmd.map (ModifyConnection id) cx )
 
         Modify id msg ->
-            case Dict.get id model.symbols of 
+            case Dict.get id model.symbols of
                 Nothing -> noFx model
                 Just sym ->
                     let (sym', eff) = Symbol.update msg sym

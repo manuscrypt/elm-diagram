@@ -2,7 +2,6 @@ module SvgFlowArrow exposing ( toSvg )
 
 import Svg exposing (..)
 import Svg.Attributes as SA exposing (..)
-import SvgUtils
 import Html exposing (Html)
 import Html.Attributes as HA
 import Html.Events exposing (onInput)
@@ -14,6 +13,9 @@ import Color.Convert exposing (colorToHex)
 
 import Html.App as Html
 import Time exposing (Time, second)
+
+import Extra.MathVector2 exposing ( rotate )
+import Extra.Svg as SvgUtils exposing (..)
 
 rotate : Vec2 -> Float -> Vec2
 rotate v g =
