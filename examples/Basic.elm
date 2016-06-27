@@ -86,7 +86,7 @@ init =
             List.map (\s -> DiagramMsg <| AddNode Color.white (vec2 20 20) <| toVec s) sample
 
         msgs' =
-            List.map (\a -> DiagramMsg <| Connect a) sampleCons4
+            List.map (\a -> DiagramMsg <| Connect a) sampleCons3
 
         ( d, dx ) =
             Diagram.init
@@ -172,7 +172,7 @@ template =
         [ HA.style
             [ (,) "position" "absolute"
             , (,) "top" "-10px"
-            , (,) "left" "-10px"
+            , (,) "left" "35px"
             , (,) "border" "1px solid black"
             , (,) "opacity" "0.1"
             , (,) "z-index" "2"
@@ -187,7 +187,7 @@ view model =
     Html.div [ bodyStyle ]
         [ Html.div []
             [ diagram model
-              --, template
+            , template
             ]
         , Html.div [ HA.style [ (,) "clear" "both", (,) "position" "relative" ] ] [ Html.text <| toString model ]
         ]
