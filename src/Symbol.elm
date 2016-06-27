@@ -7,8 +7,6 @@ import Svg.Events as SE
 import Util exposing (noFx)
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
-import Drag
-
 
 type Shape
     = Circle

@@ -1,4 +1,4 @@
-module DepSampleSelf exposing (..)
+module BasicElmDeps exposing (..)
 
 import Html.App
 import Html
@@ -20,6 +20,7 @@ html = fst <| CompilationUnit.init "elm-stuff/packages/elm-lang/html/1.0.0/src/H
 html' = fst <| CompilationUnit.update (AddDependencies (Dependencies [attrs])) html
 html'' = fst <| CompilationUnit.update (AddDependencies (Dependencies [app])) html'
 
+init : ( CompilationUnit.Model, Cmd Msg ) 
 init =
    let (c0, c0x) = CompilationUnit.init "examples/Basic.elm"
        (withDeps, withDepsFx) = CompilationUnit.update (AddDependencies (Dependencies [html''])) c0
