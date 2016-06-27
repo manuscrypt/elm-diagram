@@ -12,9 +12,11 @@ import Symbol
 import CompilationUnit exposing (..)
 import BasicElmDeps
 
-rootCU : List CompilationUnit.Model
-rootCU = 
-    [ fst BasicElmDeps.init         
+rootCUs : List CompilationUnit.Model
+rootCUs = 
+    [ fst BasicElmDeps.init    
+    , 
+    fst BasicElmDeps.sample2
     ]
 
 type alias Model =
@@ -27,34 +29,98 @@ type Msg
     | DiagramMsg Diagram.Msg
 
 
-createDiagram : List CompilationUnit.Model -> Diagram.Model
-createDiagram roots =
-    let d = ( fst Diagram.init )
-    --in Diagram.update ( Diagram.AddNode Color.white (vec2 20 20) (vec2 100 100 ) )
-    in d  
+type alias LayoutNode = {
+    pos : Vec2,
+    color : Color
+}
+
+type alias LayoutCell = 
+    { cu : CompilationUnit.Model 
+    , index : Int
+    }
+{-
+type alias LayoutRow = 
+    { cells : List LayoutCell        
+    }
+-}
+type alias Layout = 
+    --{ rows : List LayoutRow
+    --{ cus : List CompilationUnit.Model
+    {
+        cells: List LayoutCell
+        --Dict.Dict CompilationUnit.Model LayoutCell
+    }
+
+addCu : CompilationUnit.Model -> Layout -> Layout
+addCu cu layout =
+    let newIndex = List.length layout.cells
+        newCell = LayoutCell cu newIndex
+        withCu = { layout | cells = layout.cells ++ [ newCell ] }
+        (Dependencies deps) = cu.deps
+    in List.foldl addCu withCu deps    
+
+addRootCu : CompilationUnit.Model -> Layout -> Layout
+addRootCu cu layout = 
+    addCu cu ( Debug.log "addRootCu" layout )     
+
+addRootCus : List CompilationUnit.Model -> Layout -> Layout
+addRootCus cus layout = 
+    List.foldl addRootCu layout cus
+
+createNode : Int -> LayoutCell -> LayoutNode
+createNode index cell = 
+    let x = 30 + ( ( toFloat index ) * 75 )
+        y = 330 - ( ( toFloat index ) * 25 )
+    in LayoutNode ( vec2 x y ) Color.red 
+
+getNodes : Layout -> List LayoutNode
+getNodes layout =
+    List.indexedMap createNode layout.cells
+
+createNodes layout = 
+    List.map ( \node -> ( Diagram.AddNode node.color (vec2 20 20) node.pos ) ) ( getNodes layout )
+
+getCell : CompilationUnit.Model -> Layout -> Maybe LayoutCell
+getCell cu layout = 
+    let cs = List.filter ( \cell -> cell.cu == cu ) layout.cells
+    in case cs of 
+    [a] -> Maybe.Just a 
+    _ -> Maybe.Nothing
+
+createConn : LayoutCell -> CompilationUnit.Model -> Layout -> Diagram.Msg
+createConn fromCell toCu layout =
+    let toCell = ( getCell toCu layout )
+    in case toCell of
+    Just t -> Diagram.Connect [ t.index, fromCell.index ] --fromCell.index toCell.index ]
+    Nothing -> Diagram.Connect [ 0, 1 ] --fromCell.index toCell.index ]
+
+createConnForDeps cell layout =
+    let (Dependencies deps) = cell.cu.deps
+    in 
+    List.map ( \dep -> createConn cell dep layout ) deps
+
+createConns layout = 
+    List.concat ( List.map ( \cell -> createConnForDeps cell layout ) layout.cells )
+            
+
 
 init : ( Model, Cmd Msg )
 init =
-    ( { diagram = ( createDiagram rootCU ) }, Cmd.none )
-{--
-    let
-        msgs =
-            List.map (\s -> DiagramMsg <| AddNode Color.white (vec2 20 20) <| toVec s) sample
-
-        msgs' =
-            List.map (\a -> DiagramMsg <| Connect a) sampleCons3
-
+    let layout = addRootCus rootCUs ( Layout [] )
+    in
+    let diagramMsgs = List.map ( \a -> DiagramMsg a ) ( 
+            ( createNodes layout ) 
+            ++ ( createConns layout ) 
+        )
         ( d, dx ) =
             Diagram.init
 
-        m0 =
-            ( { diagram = d
-              }
-            , Cmd.batch [ Cmd.map DiagramMsg dx ]
-            )
+        m0 = ( { diagram = d}
+             , Cmd.batch [ Cmd.map DiagramMsg dx ]
+             )
     in
-        updateMany (msgs ++ msgs') update m0
-        --}
+        updateMany ( diagramMsgs ) update m0
+
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =

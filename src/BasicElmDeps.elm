@@ -26,6 +26,32 @@ init =
        (withDeps, withDepsFx) = CompilationUnit.update (AddDependencies (Dependencies [html''])) c0
    in withDeps ! ([ c0x, withDepsFx ])
 
+--  21-->22
+--    +->23
+--       23-->24
+--    +->24
+--
+--  
+
+sample24 = fst <| CompilationUnit.init "Sample24.elm"
+sample23a = fst <| CompilationUnit.init "Sample23.elm"
+sample23 = fst <| CompilationUnit.update (AddDependencies (Dependencies [sample24])) sample23a
+sample22 = fst <| CompilationUnit.init "Sample22.elm"
+--sample22 = fst <| CompilationUnit.update (AddDependencies (Dependencies [sample24])) sample22a
+--sample24 = fst <| CompilationUnit.init "Sample24.elm"
+--sample21a = fst <| CompilationUnit.init "Sample21.elm"
+--sample21b = fst <| CompilationUnit.update (AddDependencies (Dependencies [sample22])) sample21a
+--sample21c = fst <| CompilationUnit.update (AddDependencies (Dependencies [sample24])) sample21b
+sample21a = fst <| CompilationUnit.init "Sample21.elm"
+sample21b = fst <| CompilationUnit.update (AddDependencies (Dependencies [sample22])) sample21a
+sample21 = fst <| CompilationUnit.update (AddDependencies (Dependencies [sample23])) sample21b
+
+sample2 : ( CompilationUnit.Model, Cmd Msg ) 
+sample2 =
+   let (c0, c0x) = CompilationUnit.init "examples/Sample2.elm"
+       (withDeps, withDepsFx) = CompilationUnit.update (AddDependencies (Dependencies [sample21])) c0
+   in withDeps ! ([ c0x, withDepsFx ])
+
 update msg model =
     model ! []
 
