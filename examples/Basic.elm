@@ -9,20 +9,16 @@ import Svg exposing (Svg)
 import Util exposing (noFx, updateOne, updateMany)
 import Diagram exposing (..)
 import Symbol
-import Event
-import Drag
 
 
 type alias Model =
     { diagram : Diagram.Model
-    , drag : Drag.Model Symbol.Model
     }
 
 
 type Msg
     = NoOp
     | DiagramMsg Diagram.Msg
-    | DragMsg (Drag.Msg Symbol.Model)
 
 
 (=>) =
@@ -91,14 +87,10 @@ init =
         ( d, dx ) =
             Diagram.init
 
-        ( drag, dragCmd ) =
-            Drag.init
-
         m0 =
             ( { diagram = d
-              , drag = drag
               }
-            , Cmd.batch [ Cmd.map DiagramMsg dx, Cmd.map DragMsg dragCmd ]
+            , Cmd.batch [ Cmd.map DiagramMsg dx ]
             )
     in
         updateMany (msgs ++ msgs') update m0
@@ -116,44 +108,6 @@ update msg model =
                     Diagram.update msg model.diagram
             in
                 ( { model | diagram = d }, Cmd.map DiagramMsg fx )
-
-        DragMsg msg ->
-            let
-                ( drag', cmd', symbol ) =
-                    Debug.log "x" <| Drag.update msg model.drag
-
-                model' =
-                    { model | drag = drag' }
-
-                ( model'', cmd'' ) =
-                    onDragEvent symbol model'
-            in
-                ( model'', Cmd.batch [ Cmd.map DragMsg cmd', cmd'' ] )
-
-
-onDragEvent : Drag.Event Symbol.Model -> Model -> ( Model, Cmd Msg )
-onDragEvent event model =
-    case event of
-        -- Drag.OnDragStart ->
-        --     update (DragMsg <| Drag.DragStart event) model
-        Drag.OnMove position symbol ->
-            let
-                posVec =
-                    (vec2 (toFloat position.x) (toFloat position.y))
-
-                dx =
-                    Debug.log "dragmove" <| sub posVec symbol.pos
-
-                msg =
-                    DiagramMsg <| Modify symbol.id (Symbol.Move posVec)
-
-                --Drag.calculateOffsetWithinBounds model.drag model.pos (round <| getY model.diagram.size) event.amount
-            in
-                update msg model
-
-        _ ->
-            model ! []
-
 
 diagram : Model -> Svg Msg
 diagram model =
@@ -211,17 +165,3 @@ bodyStyle =
         , (,) "border" "1px solid black"
         , (,) "background-color" "#EEEEEE"
         ]
-
-
-
--- subscriptions : Model -> Sub Msg
--- subscriptions model =
---     Sub.batch
---         [ Sub.map DiagramMsg <| Diagram.subscriptions model.diagram
---         ]
--- AddBall vec ->
---     let
---         msg =
---             Diagram.AddBall vec
---     in
---         update (DiagramMsg msg) model

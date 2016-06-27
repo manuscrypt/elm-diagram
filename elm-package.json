@@ -10,6 +10,7 @@
     "dependencies": {
         "Fresheyeball/elm-tuple-extra": "2.1.0 <= v < 3.0.0",
         "NoRedInk/elm-task-extra": "2.0.0 <= v < 3.0.0",
+        "bardt/elm-rosetree": "1.0.1 <= v < 2.0.0",
         "elm-community/array-extra": "1.0.1 <= v < 2.0.0",
         "elm-community/easing-functions": "1.0.1 <= v < 2.0.0",
         "elm-community/elm-linear-algebra": "2.0.1 <= v < 3.0.0",
@@ -23,6 +24,7 @@
         "elm-lang/window": "1.0.0 <= v < 2.0.0",
         "eskimoblood/elm-color-extra": "3.0.2 <= v < 4.0.0",
         "ohanhi/keyboard-extra": "1.1.0 <= v < 2.0.0",
+        "project-fuzzball/test": "3.0.0 <= v < 4.0.0",
         "szabba/elm-animations": "2.0.0 <= v < 3.0.0"
     },
     "elm-version": "0.17.0 <= v < 0.18.0"

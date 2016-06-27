@@ -2,12 +2,12 @@ module SvgUtils exposing (..)
 
 import Svg
 import Svg.Attributes as SA
+import Color exposing (Color)
 import Html
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
 import VirtualDom exposing (Node)
 import String
 import Debug
-import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
 
 --type Stroke = Transparent | SolidStroke
