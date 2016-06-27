@@ -6,10 +6,12 @@ import SvgUtils
 import Html exposing (Html)
 import Html.Attributes as HA
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, add, sub, direction )
+import MathVector2Utils exposing ( rotate )
 import VirtualDom exposing (Node)
 import String
 import Color exposing ( Color )
 import Color.Convert exposing (colorToHex)
+
 
 import Html.App as Html
 import Time exposing (Time, second)
@@ -18,26 +20,11 @@ nothing =
   "Nothing"
 
 
-rotate : Vec2 -> Float -> Vec2
-rotate v g =
-    let ix = getX v
-        iy = getY v
-        r = g * 0.017453293
-        s = sin r
-        c = cos r
-        sx = s * ix
-        cx = c * ix
-        sy = s * iy
-        cy = c * iy
-        tx = cx - sy
-        ty = sx + cy
-    in vec2 tx ty
-
 pfeilstroke = SvgUtils.Stroke Color.black 1
 pfeil targetPos unnormalizedDirection fillcolor =
     let fromdir = Math.Vector2.normalize ( unnormalizedDirection )
         startPos = Math.Vector2.add targetPos ( Math.Vector2.scale 15 fromdir )
-        rightdir = ( Math.Vector2.scale 5 ( rotate fromdir 90 ) )
+        rightdir = ( Math.Vector2.scale 5 ( MathVector2Utils.rotate fromdir 90 ) )
         leftdir = Math.Vector2.scale  -1 rightdir
     in
     let dstr = (

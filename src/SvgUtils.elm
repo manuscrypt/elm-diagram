@@ -5,6 +5,7 @@ import Svg.Attributes as SA
 import Color exposing (Color)
 import Html
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
+import MathVector2Utils 
 import VirtualDom exposing (Node)
 import String
 import Debug
@@ -15,6 +16,21 @@ type alias Stroke =
   { color : Color
   , width : Float
   }
+
+arrow targetPos unnormalizedDirection stroke fillcolor =
+    let fromdir = Math.Vector2.normalize ( unnormalizedDirection )
+        startPos = Math.Vector2.add targetPos ( Math.Vector2.scale 15 fromdir )
+        rightdir = ( Math.Vector2.scale 5 ( MathVector2Utils.rotate fromdir 90 ) )
+        leftdir = Math.Vector2.scale  -1 rightdir
+    in
+    let dstr = (
+      "M " ++ ( vecToStringX_Y targetPos )
+      ++ ", " ++ ( vecToStringX_Y ( Math.Vector2.add startPos rightdir ) )
+      ++ ", " ++ ( vecToStringX_Y ( Math.Vector2.add startPos leftdir ) )
+      ++ ", " ++ ( vecToStringX_Y targetPos )
+      )
+    in Svg.path ( [ SA.d dstr, SA.fill ( colorToHex fillcolor ) ] ++ ( strokeToSA stroke ) ) []
+
 
 circle : Vec2 -> Float -> Stroke -> Color -> VirtualDom.Node a
 circle pos radius stroke fillcolor =
