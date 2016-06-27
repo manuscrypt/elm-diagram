@@ -1,4 +1,4 @@
-module Main exposing (..)
+module Basic exposing (..)
 
 import Html
 import Html.App as App
@@ -6,7 +6,7 @@ import Html.Attributes as HA
 import Color exposing (Color)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY, sub)
 import Svg exposing (Svg)
-import Util exposing (noFx, updateOne, updateMany)
+import Extra.Cmd exposing (noFx, updateOne, updateMany)
 import Diagram exposing (..)
 import Symbol
 

@@ -2,29 +2,29 @@ module SvgCompilerProgressVisualization exposing ( nothing )
 
 import Svg exposing (..)
 import Svg.Attributes as SA exposing (..)
-import SvgUtils
 import Html exposing (Html)
 import Html.Attributes as HA
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, add, sub, direction )
-import MathVector2Utils exposing ( rotate )
+
 import VirtualDom exposing (Node)
 import String
 import Color exposing ( Color )
 import Color.Convert exposing (colorToHex)
 
-
 import Html.App as Html
 import Time exposing (Time, second)
+
+import Extra.MathVector2 exposing ( rotate )
+import Extra.Svg as SvgUtils exposing (Stroke,bezierLineWithDirection,arrow)
 
 nothing =
   "Nothing"
 
-
-pfeilstroke = SvgUtils.Stroke Color.black 1
+pfeilstroke = Stroke Color.black 1
 pfeil targetPos unnormalizedDirection fillcolor =
     let fromdir = Math.Vector2.normalize ( unnormalizedDirection )
         startPos = Math.Vector2.add targetPos ( Math.Vector2.scale 15 fromdir )
-        rightdir = ( Math.Vector2.scale 5 ( MathVector2Utils.rotate fromdir 90 ) )
+        rightdir = ( Math.Vector2.scale 5 ( Extra.MathVector2.rotate fromdir 90 ) )
         leftdir = Math.Vector2.scale  -1 rightdir
     in
     let dstr = (

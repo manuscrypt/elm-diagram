@@ -1,1 +1,1 @@
-rm -r elm-stuff/build-artifacts
+rm -r elm-stuff/build-artifacts && elm-package install -y

@@ -4,16 +4,13 @@ import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY)
 import Svg exposing (Svg)
 import Svg.Attributes as SA
 import Svg.Events as SE
-import Util exposing (noFx)
+import Extra.Cmd exposing (noFx)
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
-import Drag
-
 
 type Shape
     = Circle
     | Rect
-
 
 type alias Model =
     { id : Int
@@ -23,12 +20,10 @@ type alias Model =
     , pos : Vec2
     }
 
-
 type Msg
     = Move Vec2
     | SetColor Color
     | Resize Vec2
-
 
 init : Int -> Shape -> Color -> Vec2 -> Vec2 -> ( Model, Cmd Msg )
 init id shape color size pos =
