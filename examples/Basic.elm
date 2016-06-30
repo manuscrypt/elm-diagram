@@ -78,7 +78,7 @@ init : ( Model, Cmd Msg )
 init =
     let
         syms =
-            fst <| List.unzip <| List.indexedMap (\i s -> Symbol.init i Color.white (vec2 20 20) <| toVec s) sample
+            fst <| List.unzip <| List.indexedMap (\i s -> Symbol.init i (toString i) Color.white (vec2 20 20) <| toVec s) sample
 
         msgs' =
             List.map (\a -> DiagramMsg <| Connect a) sampleCons3

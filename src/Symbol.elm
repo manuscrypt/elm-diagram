@@ -13,6 +13,7 @@ type Shape
 
 type alias Model =
     { id : Int
+    , label : String
     , shape : Shape
     , color : Color
     , size : Vec2
@@ -27,9 +28,9 @@ type Msg
     | NoOp
 
 
-init : Int -> Color -> Vec2 -> Vec2 -> ( Model, Cmd Msg )
-init id color size pos =
-    (Model id Circle color size pos) ! []
+init : Int -> String -> Color -> Vec2 -> Vec2 -> ( Model, Cmd Msg )
+init id label color size pos =
+    (Model id label Circle color size pos) ! []
 
 update : Msg -> Model -> ( Model, Cmd Msg ) 
 update msg model =
@@ -56,7 +57,7 @@ view model =
                 , SA.textAnchor "middle"
                 , SA.alignmentBaseline "middle"
                 , SA.style "font-weight:bold; font-size:25; font-family: Courier"
-                ] [ Svg.text <| toString model.id ]
+                ] [ Svg.text model.label ]
     in 
         Svg.g
             [ SA.transform <| translate model.pos

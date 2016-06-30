@@ -8,11 +8,8 @@ import Connection
 import Svg exposing (Svg)
 import Svg.Attributes as SA
 import Extra.Cmd exposing (noFx)
-import Layout
-import DependencyGraph exposing (Edge, Vertex)
-import Tuple2
 
-type alias Model=
+type alias Model =
     { size : Vec2
     , gridSize : Vec2
     , symbols : Dict.Dict Int Symbol.Model
@@ -33,27 +30,6 @@ init syms conns =
         , symbols = Dict.fromList <| List.map (\r -> (r.id,r)) syms
         , connections = conns
         } ! []
-
-createSymbols: List Layout.LayoutNode -> (List  Symbol.Model, List (Cmd Symbol.Msg))
-createSymbols nodes = 
-    List.unzip <| List.indexedMap (\i node -> Symbol.init i node.color (vec2 20 20) node.pos ) nodes 
-
-createConnection: List Symbol.Model -> Layout.Model a -> Edge a -> Connection.Model
-createConnection symbols layout edge = 
-    let cells = edgeToCells edge layout 
-        syms = cellsToSymbols cells symbols
-    in Connection.init syms 
-
-
-cellsToSymbols: List (Layout.LayoutCell a) -> List Symbol.Model -> List Symbol.Model
-cellsToSymbols cells symbols =
-    let idxs = List.map .index cells
-    in List.filter (\s -> List.member s.id idxs) symbols 
-
-edgeToCells: Edge a -> Layout.Model a -> List (Layout.LayoutCell a)
-edgeToCells e layout =
-    let vs = Tuple2.toList e
-    in List.filterMap (Layout.getCell layout) vs
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =

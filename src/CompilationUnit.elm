@@ -1,6 +1,8 @@
 module CompilationUnit exposing (..)
 
-type alias Filename = String
+import ElmFile exposing (ElmFile)
+
+type alias Filename = ElmFile
 
 type CompilationStatus
   = Unknown
@@ -16,7 +18,7 @@ type alias Model =
 type Msg
   = SetStatus CompilationStatus
 
-init: String->Model
+init: ElmFile->Model
 init filename =
   { filename = filename, status = Unknown } 
 
@@ -26,6 +28,6 @@ update msg model =
     SetStatus status ->
       { model | status = status }
 
-fromList: List String -> List Model
+fromList: List ElmFile -> List Model
 fromList strs = 
   List.map init strs
