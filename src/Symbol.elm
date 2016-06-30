@@ -3,7 +3,6 @@ module Symbol exposing (..)
 import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY)
 import Svg exposing (Svg)
 import Svg.Attributes as SA
-import Svg.Events as SE
 import Extra.Cmd exposing (noFx)
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
@@ -20,17 +19,19 @@ type alias Model =
     , pos : Vec2
     }
 
+
 type Msg
     = Move Vec2
     | SetColor Color
     | Resize Vec2
-
-init : Int -> Shape -> Color -> Vec2 -> Vec2 -> ( Model, Cmd Msg )
-init id shape color size pos =
-    noFx <| Model id shape color size pos
+    | NoOp
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+init : Int -> Color -> Vec2 -> Vec2 -> ( Model, Cmd Msg )
+init id color size pos =
+    (Model id Circle color size pos) ! []
+
+update : Msg -> Model -> ( Model, Cmd Msg ) 
 update msg model =
     case msg of
         Move pos ->
@@ -42,21 +43,31 @@ update msg model =
         Resize size ->
             noFx { model | size = size }
 
+        NoOp ->
+            noFx model
+
 
 view : Model -> Svg Msg
 view model =
     let
-        content =
-            toSvg model
-    in
+        label = Svg.text'
+                [ SA.x "0"
+                , SA.y "1"
+                , SA.textAnchor "middle"
+                , SA.alignmentBaseline "middle"
+                , SA.style "font-weight:bold; font-size:25; font-family: Courier"
+                ] [ Svg.text <| toString model.id ]
+    in 
         Svg.g
             [ SA.transform <| translate model.pos
               --, SE.onMouseDown (Drag.start DragMsg Drag.OnDragStart)
             ]
-            [ content ]
+            [ toSvg model
+            , label
+            ]
 
 
-toSvg : Model -> Svg Msg
+toSvg : Model-> Svg Msg
 toSvg model =
     case model.shape of
         Circle ->
@@ -76,7 +87,7 @@ attrs list =
     List.map (\( k, v ) -> k v) list
 
 
-circle : Model -> List ( String -> Svg.Attribute b, String )
+circle : Model-> List ( String -> Svg.Attribute b, String )
 circle model =
     [ ( SA.cx, "0" )
     , ( SA.cy, "0" )
@@ -86,7 +97,7 @@ circle model =
     ]
 
 
-rect : Model -> List ( String -> Svg.Attribute b, String )
+rect : Model-> List ( String -> Svg.Attribute b, String )
 rect model =
     [ ( SA.x, "0" )
     , ( SA.y, "0" )
@@ -100,13 +111,3 @@ rect model =
 move : { a | pos : Vec2 } -> Float -> { a | pos : Vec2 }
 move model t =
     { model | pos = Vec2.add model.pos (Vec2.scale t (vec2 1 1)) }
-
-
-subscriptions model =
-    Sub.none
-
-
-
--- Sub.batch
---     [ Sub.map DragMsg <| Drag.subscriptions model.drag
---     ]

@@ -1,0 +1,30 @@
+{
+  "name": "elm-diagram",
+  "version": "1.0.0",
+  "description": "Elm Svg Diagramming Utility (to be used for compiler-progress-visualization)",
+  "main": "server.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ManuScriptHub/elm-diagram.git"
+  },
+  "keywords": [],
+  "author": "Manuel Baumann <manuel.baumann@noser.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ManuScriptHub/elm-diagram/issues"
+  },
+  "homepage": "https://github.com/ManuScriptHub/elm-diagram#readme",
+  "dependencies": {
+    "event-stream": "^3.3.3",
+    "readdirp": "^2.1.0"
+  }
+}

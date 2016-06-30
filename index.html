@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html><head><meta charset="UTF-8"><title>Basic</title><style>html,head,body { padding:0; margin:0; }
+<html><head><meta charset="UTF-8"><title>DependencyGraph</title><style>html,head,body { padding:0; margin:0; }
 body { font-family: calibri, helvetica, arial, sans-serif; }</style><script type="text/javascript">
 (function() {
 'use strict';
@@ -5612,6 +5612,34 @@ function nodeHelp(tag, factList, kidList)
 }
 
 
+function keyedNode(tag, factList, kidList)
+{
+	var organized = organizeFacts(factList);
+	var namespace = organized.namespace;
+	var facts = organized.facts;
+
+	var children = [];
+	var descendantsCount = 0;
+	while (kidList.ctor !== '[]')
+	{
+		var kid = kidList._0;
+		descendantsCount += (kid._1.descendantsCount || 0);
+		children.push(kid);
+		kidList = kidList._1;
+	}
+	descendantsCount += children.length;
+
+	return {
+		type: 'keyed-node',
+		tag: tag,
+		facts: facts,
+		children: children,
+		namespace: namespace,
+		descendantsCount: descendantsCount
+	};
+}
+
+
 function custom(factList, model, impl)
 {
 	var facts = organizeFacts(factList).facts;
@@ -5643,7 +5671,7 @@ function thunk(func, args, thunk)
 		func: func,
 		args: args,
 		thunk: thunk,
-		node: null
+		node: undefined
 	};
 }
 
@@ -5795,7 +5823,7 @@ function equalEvents(a, b)
 
 function renderer(parent, tagger, initialVirtualNode)
 {
-	var eventNode = { tagger: tagger, parent: null };
+	var eventNode = { tagger: tagger, parent: undefined };
 
 	var domNode = render(initialVirtualNode, eventNode);
 	parent.appendChild(domNode);
@@ -5868,7 +5896,7 @@ function render(vNode, eventNode)
 		case 'tagger':
 			var subNode = vNode.node;
 			var tagger = vNode.tagger;
-		
+
 			while (subNode.type === 'tagger')
 			{
 				typeof tagger !== 'object'
@@ -5877,12 +5905,12 @@ function render(vNode, eventNode)
 
 				subNode = subNode.node;
 			}
-            
+
 			var subEventRoot = {
 				tagger: tagger,
 				parent: eventNode
 			};
-			
+
 			var domNode = render(subNode, subEventRoot);
 			domNode.elm_event_node_ref = subEventRoot;
 			return domNode;
@@ -5902,6 +5930,22 @@ function render(vNode, eventNode)
 			for (var i = 0; i < children.length; i++)
 			{
 				domNode.appendChild(render(children[i], eventNode));
+			}
+
+			return domNode;
+
+		case 'keyed-node':
+			var domNode = vNode.namespace
+				? document.createElementNS(vNode.namespace, vNode.tag)
+				: document.createElement(vNode.tag);
+
+			applyFacts(domNode, eventNode, vNode.facts);
+
+			var children = vNode.children;
+
+			for (var i = 0; i < children.length; i++)
+			{
+				domNode.appendChild(render(children[i]._1, eventNode));
 			}
 
 			return domNode;
@@ -6096,8 +6140,8 @@ function makePatch(type, index, data)
 		index: index,
 		type: type,
 		data: data,
-		domNode: null,
-		eventNode: null
+		domNode: undefined,
+		eventNode: undefined
 	};
 }
 
@@ -6222,6 +6266,25 @@ function diffHelp(a, b, patches, index)
 			diffChildren(a, b, patches, index);
 			return;
 
+		case 'keyed-node':
+			// Bail if obvious indicators have changed. Implies more serious
+			// structural changes such that it's not worth it to diff.
+			if (a.tag !== b.tag || a.namespace !== b.namespace)
+			{
+				patches.push(makePatch('p-redraw', index, b));
+				return;
+			}
+
+			var factsDiff = diffFacts(a.facts, b.facts);
+
+			if (typeof factsDiff !== 'undefined')
+			{
+				patches.push(makePatch('p-facts', index, factsDiff));
+			}
+
+			diffKeyedChildren(a, b, patches, index);
+			return;
+
 		case 'custom':
 			if (a.impl !== b.impl)
 			{
@@ -6342,11 +6405,11 @@ function diffChildren(aParent, bParent, patches, rootIndex)
 
 	if (aLen > bLen)
 	{
-		patches.push(makePatch('p-remove', rootIndex, aLen - bLen));
+		patches.push(makePatch('p-remove-last', rootIndex, aLen - bLen));
 	}
 	else if (aLen < bLen)
 	{
-		patches.push(makePatch('p-insert', rootIndex, bChildren.slice(aLen)));
+		patches.push(makePatch('p-append', rootIndex, bChildren.slice(aLen)));
 	}
 
 	// PAIRWISE DIFF EVERYTHING ELSE
@@ -6360,6 +6423,260 @@ function diffChildren(aParent, bParent, patches, rootIndex)
 		diffHelp(aChild, bChildren[i], patches, index);
 		index += aChild.descendantsCount || 0;
 	}
+}
+
+
+
+////////////  KEYED DIFF  ////////////
+
+
+function diffKeyedChildren(aParent, bParent, patches, rootIndex)
+{
+	var localPatches = [];
+
+	var changes = {}; // Dict String Entry
+	var inserts = []; // Array { index : Int, entry : Entry }
+	// type Entry = { tag : String, vnode : VNode, index : Int, data : _ }
+
+	var aChildren = aParent.children;
+	var bChildren = bParent.children;
+	var aLen = aChildren.length;
+	var bLen = bChildren.length;
+	var aIndex = 0;
+	var bIndex = 0;
+
+	var index = rootIndex;
+
+	while (aIndex < aLen && bIndex < bLen)
+	{
+		var a = aChildren[aIndex];
+		var b = bChildren[bIndex];
+
+		var aKey = a._0;
+		var bKey = b._0;
+		var aNode = a._1;
+		var bNode = b._1;
+
+		// check if keys match
+
+		if (aKey === bKey)
+		{
+			index++;
+			diffHelp(aNode, bNode, localPatches, index);
+			index += aNode.descendantsCount || 0;
+
+			aIndex++;
+			bIndex++;
+			continue;
+		}
+
+		// look ahead 1 to detect insertions and removals.
+
+		var aLookAhead = aIndex + 1 < aLen;
+		var bLookAhead = bIndex + 1 < bLen;
+
+		if (aLookAhead)
+		{
+			var aNext = aChildren[aIndex + 1];
+			var aNextKey = aNext._0;
+			var aNextNode = aNext._1;
+			var oldMatch = bKey === aNextKey;
+		}
+
+		if (bLookAhead)
+		{
+			var bNext = bChildren[bIndex + 1];
+			var bNextKey = bNext._0;
+			var bNextNode = bNext._1;
+			var newMatch = aKey === bNextKey;
+		}
+
+
+		// swap a and b
+		if (aLookAhead && bLookAhead && newMatch && oldMatch)
+		{
+			index++;
+			diffHelp(aNode, bNextNode, localPatches, index);
+			insertNode(changes, localPatches, aKey, bNode, bIndex, inserts);
+			index += aNode.descendantsCount || 0;
+
+			index++;
+			removeNode(changes, localPatches, aKey, aNextNode, index);
+			index += aNextNode.descendantsCount || 0;
+
+			aIndex += 2;
+			bIndex += 2;
+			continue;
+		}
+
+		// insert b
+		if (bLookAhead && newMatch)
+		{
+			index++;
+			insertNode(changes, localPatches, bKey, bNode, bIndex, inserts);
+			diffHelp(aNode, bNextNode, localPatches, index);
+			index += aNode.descendantsCount || 0;
+
+			aIndex += 1;
+			bIndex += 2;
+			continue;
+		}
+
+		// remove a
+		if (aLookAhead && oldMatch)
+		{
+			index++;
+			removeNode(changes, localPatches, aKey, aNode, index);
+			index += aNode.descendantsCount || 0;
+
+			index++;
+			diffHelp(aNextNode, bNode, localPatches, index);
+			index += aNextNode.descendantsCount || 0;
+
+			aIndex += 2;
+			bIndex += 1;
+			continue;
+		}
+
+		// remove a, insert b
+		if (aLookAhead && bLookAhead && aNextKey === bNextKey)
+		{
+			index++;
+			removeNode(changes, localPatches, aKey, aNode, index);
+			insertNode(changes, localPatches, bKey, bNode, bIndex, inserts);
+			index += aNode.descendantsCount || 0;
+
+			index++;
+			diffHelp(aNextNode, bNextNode, localPatches, index);
+			index += aNextNode.descendantsCount || 0;
+
+			aIndex += 2;
+			bIndex += 2;
+			continue;
+		}
+
+		break;
+	}
+
+	// eat up any remaining nodes with removeNode and insertNode
+
+	while (aIndex < aLen)
+	{
+		index++;
+		var a = aChildren[aIndex];
+		var aNode = a._1;
+		removeNode(changes, localPatches, a._0, aNode, index);
+		index += aNode.descendantsCount || 0;
+		aIndex++;
+	}
+
+	var endInserts;
+	while (bIndex < bLen)
+	{
+		endInserts = endInserts || [];
+		var b = bChildren[bIndex];
+		insertNode(changes, localPatches, b._0, b._1, undefined, endInserts);
+		bIndex++;
+	}
+
+	if (localPatches.length > 0 || inserts.length > 0 || typeof endInserts !== 'undefined')
+	{
+		patches.push(makePatch('p-reorder', rootIndex, {
+			patches: localPatches,
+			inserts: inserts,
+			endInserts: endInserts
+		}));
+	}
+}
+
+
+
+////////////  CHANGES FROM KEYED DIFF  ////////////
+
+
+var POSTFIX = '_elmW6BL';
+
+
+function insertNode(changes, localPatches, key, vnode, bIndex, inserts)
+{
+	var entry = changes[key];
+
+	// never seen this key before
+	if (typeof entry === 'undefined')
+	{
+		entry = {
+			tag: 'insert',
+			vnode: vnode,
+			index: bIndex,
+			data: undefined
+		};
+
+		inserts.push({ index: bIndex, entry: entry });
+		changes[key] = entry;
+
+		return;
+	}
+
+	// this key was removed earlier, a match!
+	if (entry.tag === 'remove')
+	{
+		inserts.push({ index: bIndex, entry: entry });
+
+		entry.tag = 'move';
+		var subPatches = [];
+		diffHelp(entry.vnode, vnode, subPatches, entry.index);
+		entry.index = bIndex;
+		entry.data.data = {
+			patches: subPatches,
+			entry: entry
+		};
+
+		return;
+	}
+
+	// this key has already been inserted or moved, a duplicate!
+	insertNode(changes, localPatches, key + POSTFIX, vnode, bIndex, inserts);
+}
+
+
+function removeNode(changes, localPatches, key, vnode, index)
+{
+	var entry = changes[key];
+
+	// never seen this key before
+	if (typeof entry === 'undefined')
+	{
+		var patch = makePatch('p-remove', index, undefined);
+		localPatches.push(patch);
+
+		changes[key] = {
+			tag: 'remove',
+			vnode: vnode,
+			index: index,
+			data: patch
+		};
+
+		return;
+	}
+
+	// this key was inserted earlier, a match!
+	if (entry.tag === 'insert')
+	{
+		entry.tag = 'move';
+		var subPatches = [];
+		diffHelp(vnode, entry.vnode, subPatches, index);
+
+		var patch = makePatch('p-remove', index, {
+			patches: subPatches,
+			entry: entry
+		});
+		localPatches.push(patch);
+
+		return;
+	}
+
+	// this key has already been removed or moved, a duplicate!
+	removeNode(changes, localPatches, key + POSTFIX, vnode, index);
 }
 
 
@@ -6392,6 +6709,33 @@ function addDomNodesHelp(domNode, vNode, patches, i, low, high, eventNode)
 		{
 			addDomNodes(domNode, vNode.node, patch.data, eventNode);
 		}
+		else if (patchType === 'p-reorder')
+		{
+			patch.domNode = domNode;
+			patch.eventNode = eventNode;
+
+			var subPatches = patch.data.patches;
+			if (subPatches.length > 0)
+			{
+				addDomNodesHelp(domNode, vNode, subPatches, 0, low, high, eventNode);
+			}
+		}
+		else if (patchType === 'p-remove')
+		{
+			patch.domNode = domNode;
+			patch.eventNode = eventNode;
+
+			var data = patch.data;
+			if (typeof data !== 'undefined')
+			{
+				data.entry.data = domNode;
+				var subPatches = data.patches;
+				if (subPatches.length > 0)
+				{
+					addDomNodesHelp(domNode, vNode, subPatches, 0, low, high, eventNode);
+				}
+			}
+		}
 		else
 		{
 			patch.domNode = domNode;
@@ -6410,12 +6754,12 @@ function addDomNodesHelp(domNode, vNode, patches, i, low, high, eventNode)
 	{
 		case 'tagger':
 			var subNode = vNode.node;
-            
+
 			while (subNode.type === "tagger")
 			{
 				subNode = subNode.node;
 			}
-            
+
 			return addDomNodesHelp(domNode, subNode, patches, i, low + 1, high, domNode.elm_event_node_ref);
 
 		case 'node':
@@ -6425,6 +6769,26 @@ function addDomNodesHelp(domNode, vNode, patches, i, low, high, eventNode)
 			{
 				low++;
 				var vChild = vChildren[j];
+				var nextLow = low + (vChild.descendantsCount || 0);
+				if (low <= index && index <= nextLow)
+				{
+					i = addDomNodesHelp(childNodes[j], vChild, patches, i, low, nextLow, eventNode);
+					if (!(patch = patches[i]) || (index = patch.index) > high)
+					{
+						return i;
+					}
+				}
+				low = nextLow;
+			}
+			return i;
+
+		case 'keyed-node':
+			var vChildren = vNode.children;
+			var childNodes = domNode.childNodes;
+			for (var j = 0; j < vChildren.length; j++)
+			{
+				low++;
+				var vChild = vChildren[j]._1;
 				var nextLow = low + (vChild.descendantsCount || 0);
 				if (low <= index && index <= nextLow)
 				{
@@ -6497,7 +6861,7 @@ function applyPatch(domNode, patch)
 			domNode.elm_event_node_ref.tagger = patch.data;
 			return domNode;
 
-		case 'p-remove':
+		case 'p-remove-last':
 			var i = patch.data;
 			while (i--)
 			{
@@ -6505,12 +6869,80 @@ function applyPatch(domNode, patch)
 			}
 			return domNode;
 
-		case 'p-insert':
+		case 'p-append':
 			var newNodes = patch.data;
 			for (var i = 0; i < newNodes.length; i++)
 			{
 				domNode.appendChild(render(newNodes[i], patch.eventNode));
 			}
+			return domNode;
+
+		case 'p-remove':
+			var data = patch.data;
+			if (typeof data === 'undefined')
+			{
+				domNode.parentNode.removeChild(domNode);
+				return domNode;
+			}
+			var entry = data.entry;
+			if (typeof entry.index !== 'undefined')
+			{
+				domNode.parentNode.removeChild(domNode);
+			}
+			entry.data = applyPatchesHelp(domNode, data.patches);
+			return domNode;
+
+		case 'p-reorder':
+			var data = patch.data;
+
+			// end inserts
+			var endInserts = data.endInserts;
+			var end;
+			if (typeof endInserts !== 'undefined')
+			{
+				if (endInserts.length === 1)
+				{
+					var insert = endInserts[0];
+					var entry = insert.entry;
+					var end = entry.tag === 'move'
+						? entry.data
+						: render(entry.vnode, patch.eventNode);
+				}
+				else
+				{
+					end = document.createDocumentFragment();
+					for (var i = 0; i < endInserts.length; i++)
+					{
+						var insert = endInserts[i];
+						var entry = insert.entry;
+						var node = entry.tag === 'move'
+							? entry.data
+							: render(entry.vnode, patch.eventNode);
+						end.appendChild(node);
+					}
+				}
+			}
+
+			// removals
+			domNode = applyPatchesHelp(domNode, data.patches);
+
+			// inserts
+			var inserts = data.inserts;
+			for (var i = 0; i < inserts.length; i++)
+			{
+				var insert = inserts[i];
+				var entry = insert.entry;
+				var node = entry.tag === 'move'
+					? entry.data
+					: render(entry.vnode, patch.eventNode);
+				domNode.insertBefore(node, domNode.childNodes[insert.index]);
+			}
+
+			if (typeof end !== 'undefined')
+			{
+				domNode.appendChild(end);
+			}
+
 			return domNode;
 
 		case 'p-custom':
@@ -6574,11 +7006,13 @@ return {
 	lazy: F2(lazy),
 	lazy2: F3(lazy2),
 	lazy3: F4(lazy3),
+	keyedNode: F3(keyedNode),
 
 	programWithFlags: programWithFlags
 };
 
 }();var _elm_lang$virtual_dom$VirtualDom$programWithFlags = _elm_lang$virtual_dom$Native_VirtualDom.programWithFlags;
+var _elm_lang$virtual_dom$VirtualDom$keyedNode = _elm_lang$virtual_dom$Native_VirtualDom.keyedNode;
 var _elm_lang$virtual_dom$VirtualDom$lazy3 = _elm_lang$virtual_dom$Native_VirtualDom.lazy3;
 var _elm_lang$virtual_dom$VirtualDom$lazy2 = _elm_lang$virtual_dom$Native_VirtualDom.lazy2;
 var _elm_lang$virtual_dom$VirtualDom$lazy = _elm_lang$virtual_dom$Native_VirtualDom.lazy;
@@ -6702,2770 +7136,315 @@ var _elm_lang$html$Html$details = _elm_lang$html$Html$node('details');
 var _elm_lang$html$Html$summary = _elm_lang$html$Html$node('summary');
 var _elm_lang$html$Html$menuitem = _elm_lang$html$Html$node('menuitem');
 var _elm_lang$html$Html$menu = _elm_lang$html$Html$node('menu');
-var _elm_lang$html$Html_App$programWithFlags = _elm_lang$virtual_dom$VirtualDom$programWithFlags;
-var _elm_lang$html$Html_App$program = function (app) {
-	return _elm_lang$html$Html_App$programWithFlags(
-		_elm_lang$core$Native_Utils.update(
-			app,
-			{
-				init: function (_p0) {
-					return app.init;
-				}
-			}));
-};
-var _elm_lang$html$Html_App$beginnerProgram = function (_p1) {
-	var _p2 = _p1;
-	return _elm_lang$html$Html_App$programWithFlags(
-		{
-			init: function (_p3) {
-				return A2(
-					_elm_lang$core$Platform_Cmd_ops['!'],
-					_p2.model,
-					_elm_lang$core$Native_List.fromArray(
-						[]));
+var _ManuScriptHub$elm_diagram$DependencyGraph$incomingEdges = F2(
+	function (v, model) {
+		return A2(
+			_elm_lang$core$List$filter,
+			function (_p0) {
+				var _p1 = _p0;
+				return _elm_lang$core$Native_Utils.eq(_p1._1, v);
 			},
-			update: F2(
-				function (msg, model) {
-					return A2(
-						_elm_lang$core$Platform_Cmd_ops['!'],
-						A2(_p2.update, msg, model),
-						_elm_lang$core$Native_List.fromArray(
-							[]));
-				}),
-			view: _p2.view,
-			subscriptions: function (_p4) {
-				return _elm_lang$core$Platform_Sub$none;
-			}
-		});
-};
-var _elm_lang$html$Html_App$map = _elm_lang$virtual_dom$VirtualDom$map;
-var _elm_lang$html$Html_Attributes$attribute = _elm_lang$virtual_dom$VirtualDom$attribute;
-var _elm_lang$html$Html_Attributes$contextmenu = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$attribute, 'contextmenu', value);
-};
-var _elm_lang$html$Html_Attributes$property = _elm_lang$virtual_dom$VirtualDom$property;
-var _elm_lang$html$Html_Attributes$stringProperty = F2(
-	function (name, string) {
+			model.edges);
+	});
+var _ManuScriptHub$elm_diagram$DependencyGraph$outgoingEdges = F2(
+	function (v, model) {
 		return A2(
-			_elm_lang$html$Html_Attributes$property,
-			name,
-			_elm_lang$core$Json_Encode$string(string));
+			_elm_lang$core$List$filter,
+			function (_p2) {
+				var _p3 = _p2;
+				return _elm_lang$core$Native_Utils.eq(_p3._0, v);
+			},
+			model.edges);
 	});
-var _elm_lang$html$Html_Attributes$class = function (name) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'className', name);
-};
-var _elm_lang$html$Html_Attributes$id = function (name) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'id', name);
-};
-var _elm_lang$html$Html_Attributes$title = function (name) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'title', name);
-};
-var _elm_lang$html$Html_Attributes$accesskey = function ($char) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'accessKey',
-		_elm_lang$core$String$fromChar($char));
-};
-var _elm_lang$html$Html_Attributes$dir = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'dir', value);
-};
-var _elm_lang$html$Html_Attributes$draggable = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'draggable', value);
-};
-var _elm_lang$html$Html_Attributes$dropzone = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'dropzone', value);
-};
-var _elm_lang$html$Html_Attributes$itemprop = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'itemprop', value);
-};
-var _elm_lang$html$Html_Attributes$lang = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'lang', value);
-};
-var _elm_lang$html$Html_Attributes$tabindex = function (n) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'tabIndex',
-		_elm_lang$core$Basics$toString(n));
-};
-var _elm_lang$html$Html_Attributes$charset = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'charset', value);
-};
-var _elm_lang$html$Html_Attributes$content = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'content', value);
-};
-var _elm_lang$html$Html_Attributes$httpEquiv = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'httpEquiv', value);
-};
-var _elm_lang$html$Html_Attributes$language = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'language', value);
-};
-var _elm_lang$html$Html_Attributes$src = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'src', value);
-};
-var _elm_lang$html$Html_Attributes$height = function (value) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'height',
-		_elm_lang$core$Basics$toString(value));
-};
-var _elm_lang$html$Html_Attributes$width = function (value) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'width',
-		_elm_lang$core$Basics$toString(value));
-};
-var _elm_lang$html$Html_Attributes$alt = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'alt', value);
-};
-var _elm_lang$html$Html_Attributes$preload = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'preload', value);
-};
-var _elm_lang$html$Html_Attributes$poster = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'poster', value);
-};
-var _elm_lang$html$Html_Attributes$kind = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'kind', value);
-};
-var _elm_lang$html$Html_Attributes$srclang = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'srclang', value);
-};
-var _elm_lang$html$Html_Attributes$sandbox = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'sandbox', value);
-};
-var _elm_lang$html$Html_Attributes$srcdoc = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'srcdoc', value);
-};
-var _elm_lang$html$Html_Attributes$type$ = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'type', value);
-};
-var _elm_lang$html$Html_Attributes$value = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'value', value);
-};
-var _elm_lang$html$Html_Attributes$defaultValue = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'defaultValue', value);
-};
-var _elm_lang$html$Html_Attributes$placeholder = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'placeholder', value);
-};
-var _elm_lang$html$Html_Attributes$accept = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'accept', value);
-};
-var _elm_lang$html$Html_Attributes$acceptCharset = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'acceptCharset', value);
-};
-var _elm_lang$html$Html_Attributes$action = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'action', value);
-};
-var _elm_lang$html$Html_Attributes$autocomplete = function (bool) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'autocomplete',
-		bool ? 'on' : 'off');
-};
-var _elm_lang$html$Html_Attributes$autosave = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'autosave', value);
-};
-var _elm_lang$html$Html_Attributes$enctype = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'enctype', value);
-};
-var _elm_lang$html$Html_Attributes$formaction = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'formAction', value);
-};
-var _elm_lang$html$Html_Attributes$list = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'list', value);
-};
-var _elm_lang$html$Html_Attributes$minlength = function (n) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'minLength',
-		_elm_lang$core$Basics$toString(n));
-};
-var _elm_lang$html$Html_Attributes$maxlength = function (n) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'maxLength',
-		_elm_lang$core$Basics$toString(n));
-};
-var _elm_lang$html$Html_Attributes$method = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'method', value);
-};
-var _elm_lang$html$Html_Attributes$name = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'name', value);
-};
-var _elm_lang$html$Html_Attributes$pattern = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'pattern', value);
-};
-var _elm_lang$html$Html_Attributes$size = function (n) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'size',
-		_elm_lang$core$Basics$toString(n));
-};
-var _elm_lang$html$Html_Attributes$for = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'htmlFor', value);
-};
-var _elm_lang$html$Html_Attributes$form = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'form', value);
-};
-var _elm_lang$html$Html_Attributes$max = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'max', value);
-};
-var _elm_lang$html$Html_Attributes$min = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'min', value);
-};
-var _elm_lang$html$Html_Attributes$step = function (n) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'step', n);
-};
-var _elm_lang$html$Html_Attributes$cols = function (n) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'cols',
-		_elm_lang$core$Basics$toString(n));
-};
-var _elm_lang$html$Html_Attributes$rows = function (n) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'rows',
-		_elm_lang$core$Basics$toString(n));
-};
-var _elm_lang$html$Html_Attributes$wrap = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'wrap', value);
-};
-var _elm_lang$html$Html_Attributes$usemap = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'useMap', value);
-};
-var _elm_lang$html$Html_Attributes$shape = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'shape', value);
-};
-var _elm_lang$html$Html_Attributes$coords = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'coords', value);
-};
-var _elm_lang$html$Html_Attributes$challenge = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'challenge', value);
-};
-var _elm_lang$html$Html_Attributes$keytype = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'keytype', value);
-};
-var _elm_lang$html$Html_Attributes$align = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'align', value);
-};
-var _elm_lang$html$Html_Attributes$cite = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'cite', value);
-};
-var _elm_lang$html$Html_Attributes$href = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'href', value);
-};
-var _elm_lang$html$Html_Attributes$target = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'target', value);
-};
-var _elm_lang$html$Html_Attributes$downloadAs = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'download', value);
-};
-var _elm_lang$html$Html_Attributes$hreflang = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'hreflang', value);
-};
-var _elm_lang$html$Html_Attributes$media = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'media', value);
-};
-var _elm_lang$html$Html_Attributes$ping = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'ping', value);
-};
-var _elm_lang$html$Html_Attributes$rel = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'rel', value);
-};
-var _elm_lang$html$Html_Attributes$datetime = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'datetime', value);
-};
-var _elm_lang$html$Html_Attributes$pubdate = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'pubdate', value);
-};
-var _elm_lang$html$Html_Attributes$start = function (n) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'start',
-		_elm_lang$core$Basics$toString(n));
-};
-var _elm_lang$html$Html_Attributes$colspan = function (n) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'colSpan',
-		_elm_lang$core$Basics$toString(n));
-};
-var _elm_lang$html$Html_Attributes$headers = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'headers', value);
-};
-var _elm_lang$html$Html_Attributes$rowspan = function (n) {
-	return A2(
-		_elm_lang$html$Html_Attributes$stringProperty,
-		'rowSpan',
-		_elm_lang$core$Basics$toString(n));
-};
-var _elm_lang$html$Html_Attributes$scope = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'scope', value);
-};
-var _elm_lang$html$Html_Attributes$manifest = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$stringProperty, 'manifest', value);
-};
-var _elm_lang$html$Html_Attributes$boolProperty = F2(
-	function (name, bool) {
+var _ManuScriptHub$elm_diagram$DependencyGraph$outgoingNodes = F2(
+	function (v, model) {
 		return A2(
-			_elm_lang$html$Html_Attributes$property,
-			name,
-			_elm_lang$core$Json_Encode$bool(bool));
-	});
-var _elm_lang$html$Html_Attributes$hidden = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'hidden', bool);
-};
-var _elm_lang$html$Html_Attributes$contenteditable = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'contentEditable', bool);
-};
-var _elm_lang$html$Html_Attributes$spellcheck = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'spellcheck', bool);
-};
-var _elm_lang$html$Html_Attributes$async = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'async', bool);
-};
-var _elm_lang$html$Html_Attributes$defer = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'defer', bool);
-};
-var _elm_lang$html$Html_Attributes$scoped = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'scoped', bool);
-};
-var _elm_lang$html$Html_Attributes$autoplay = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'autoplay', bool);
-};
-var _elm_lang$html$Html_Attributes$controls = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'controls', bool);
-};
-var _elm_lang$html$Html_Attributes$loop = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'loop', bool);
-};
-var _elm_lang$html$Html_Attributes$default = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'default', bool);
-};
-var _elm_lang$html$Html_Attributes$seamless = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'seamless', bool);
-};
-var _elm_lang$html$Html_Attributes$checked = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'checked', bool);
-};
-var _elm_lang$html$Html_Attributes$selected = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'selected', bool);
-};
-var _elm_lang$html$Html_Attributes$autofocus = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'autofocus', bool);
-};
-var _elm_lang$html$Html_Attributes$disabled = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'disabled', bool);
-};
-var _elm_lang$html$Html_Attributes$multiple = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'multiple', bool);
-};
-var _elm_lang$html$Html_Attributes$novalidate = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'noValidate', bool);
-};
-var _elm_lang$html$Html_Attributes$readonly = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'readOnly', bool);
-};
-var _elm_lang$html$Html_Attributes$required = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'required', bool);
-};
-var _elm_lang$html$Html_Attributes$ismap = function (value) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'isMap', value);
-};
-var _elm_lang$html$Html_Attributes$download = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'download', bool);
-};
-var _elm_lang$html$Html_Attributes$reversed = function (bool) {
-	return A2(_elm_lang$html$Html_Attributes$boolProperty, 'reversed', bool);
-};
-var _elm_lang$html$Html_Attributes$classList = function (list) {
-	return _elm_lang$html$Html_Attributes$class(
-		A2(
-			_elm_lang$core$String$join,
-			' ',
-			A2(
-				_elm_lang$core$List$map,
-				_elm_lang$core$Basics$fst,
-				A2(_elm_lang$core$List$filter, _elm_lang$core$Basics$snd, list))));
-};
-var _elm_lang$html$Html_Attributes$style = _elm_lang$virtual_dom$VirtualDom$style;
-var _elm_lang$core$Color$fmod = F2(
-	function (f, n) {
-		var integer = _elm_lang$core$Basics$floor(f);
-		return (_elm_lang$core$Basics$toFloat(
-			A2(_elm_lang$core$Basics_ops['%'], integer, n)) + f) - _elm_lang$core$Basics$toFloat(integer);
-	});
-var _elm_lang$core$Color$rgbToHsl = F3(
-	function (red, green, blue) {
-		var b = _elm_lang$core$Basics$toFloat(blue) / 255;
-		var g = _elm_lang$core$Basics$toFloat(green) / 255;
-		var r = _elm_lang$core$Basics$toFloat(red) / 255;
-		var cMax = A2(
-			_elm_lang$core$Basics$max,
-			A2(_elm_lang$core$Basics$max, r, g),
-			b);
-		var cMin = A2(
-			_elm_lang$core$Basics$min,
-			A2(_elm_lang$core$Basics$min, r, g),
-			b);
-		var c = cMax - cMin;
-		var lightness = (cMax + cMin) / 2;
-		var saturation = _elm_lang$core$Native_Utils.eq(lightness, 0) ? 0 : (c / (1 - _elm_lang$core$Basics$abs((2 * lightness) - 1)));
-		var hue = _elm_lang$core$Basics$degrees(60) * (_elm_lang$core$Native_Utils.eq(cMax, r) ? A2(_elm_lang$core$Color$fmod, (g - b) / c, 6) : (_elm_lang$core$Native_Utils.eq(cMax, g) ? (((b - r) / c) + 2) : (((r - g) / c) + 4)));
-		return {ctor: '_Tuple3', _0: hue, _1: saturation, _2: lightness};
-	});
-var _elm_lang$core$Color$hslToRgb = F3(
-	function (hue, saturation, lightness) {
-		var hue$ = hue / _elm_lang$core$Basics$degrees(60);
-		var chroma = (1 - _elm_lang$core$Basics$abs((2 * lightness) - 1)) * saturation;
-		var x = chroma * (1 - _elm_lang$core$Basics$abs(
-			A2(_elm_lang$core$Color$fmod, hue$, 2) - 1));
-		var _p0 = (_elm_lang$core$Native_Utils.cmp(hue$, 0) < 0) ? {ctor: '_Tuple3', _0: 0, _1: 0, _2: 0} : ((_elm_lang$core$Native_Utils.cmp(hue$, 1) < 0) ? {ctor: '_Tuple3', _0: chroma, _1: x, _2: 0} : ((_elm_lang$core$Native_Utils.cmp(hue$, 2) < 0) ? {ctor: '_Tuple3', _0: x, _1: chroma, _2: 0} : ((_elm_lang$core$Native_Utils.cmp(hue$, 3) < 0) ? {ctor: '_Tuple3', _0: 0, _1: chroma, _2: x} : ((_elm_lang$core$Native_Utils.cmp(hue$, 4) < 0) ? {ctor: '_Tuple3', _0: 0, _1: x, _2: chroma} : ((_elm_lang$core$Native_Utils.cmp(hue$, 5) < 0) ? {ctor: '_Tuple3', _0: x, _1: 0, _2: chroma} : ((_elm_lang$core$Native_Utils.cmp(hue$, 6) < 0) ? {ctor: '_Tuple3', _0: chroma, _1: 0, _2: x} : {ctor: '_Tuple3', _0: 0, _1: 0, _2: 0}))))));
-		var r = _p0._0;
-		var g = _p0._1;
-		var b = _p0._2;
-		var m = lightness - (chroma / 2);
-		return {ctor: '_Tuple3', _0: r + m, _1: g + m, _2: b + m};
-	});
-var _elm_lang$core$Color$toRgb = function (color) {
-	var _p1 = color;
-	if (_p1.ctor === 'RGBA') {
-		return {red: _p1._0, green: _p1._1, blue: _p1._2, alpha: _p1._3};
-	} else {
-		var _p2 = A3(_elm_lang$core$Color$hslToRgb, _p1._0, _p1._1, _p1._2);
-		var r = _p2._0;
-		var g = _p2._1;
-		var b = _p2._2;
-		return {
-			red: _elm_lang$core$Basics$round(255 * r),
-			green: _elm_lang$core$Basics$round(255 * g),
-			blue: _elm_lang$core$Basics$round(255 * b),
-			alpha: _p1._3
-		};
-	}
-};
-var _elm_lang$core$Color$toHsl = function (color) {
-	var _p3 = color;
-	if (_p3.ctor === 'HSLA') {
-		return {hue: _p3._0, saturation: _p3._1, lightness: _p3._2, alpha: _p3._3};
-	} else {
-		var _p4 = A3(_elm_lang$core$Color$rgbToHsl, _p3._0, _p3._1, _p3._2);
-		var h = _p4._0;
-		var s = _p4._1;
-		var l = _p4._2;
-		return {hue: h, saturation: s, lightness: l, alpha: _p3._3};
-	}
-};
-var _elm_lang$core$Color$HSLA = F4(
-	function (a, b, c, d) {
-		return {ctor: 'HSLA', _0: a, _1: b, _2: c, _3: d};
-	});
-var _elm_lang$core$Color$hsla = F4(
-	function (hue, saturation, lightness, alpha) {
-		return A4(
-			_elm_lang$core$Color$HSLA,
-			hue - _elm_lang$core$Basics$turns(
-				_elm_lang$core$Basics$toFloat(
-					_elm_lang$core$Basics$floor(hue / (2 * _elm_lang$core$Basics$pi)))),
-			saturation,
-			lightness,
-			alpha);
-	});
-var _elm_lang$core$Color$hsl = F3(
-	function (hue, saturation, lightness) {
-		return A4(_elm_lang$core$Color$hsla, hue, saturation, lightness, 1);
-	});
-var _elm_lang$core$Color$complement = function (color) {
-	var _p5 = color;
-	if (_p5.ctor === 'HSLA') {
-		return A4(
-			_elm_lang$core$Color$hsla,
-			_p5._0 + _elm_lang$core$Basics$degrees(180),
-			_p5._1,
-			_p5._2,
-			_p5._3);
-	} else {
-		var _p6 = A3(_elm_lang$core$Color$rgbToHsl, _p5._0, _p5._1, _p5._2);
-		var h = _p6._0;
-		var s = _p6._1;
-		var l = _p6._2;
-		return A4(
-			_elm_lang$core$Color$hsla,
-			h + _elm_lang$core$Basics$degrees(180),
-			s,
-			l,
-			_p5._3);
-	}
-};
-var _elm_lang$core$Color$grayscale = function (p) {
-	return A4(_elm_lang$core$Color$HSLA, 0, 0, 1 - p, 1);
-};
-var _elm_lang$core$Color$greyscale = function (p) {
-	return A4(_elm_lang$core$Color$HSLA, 0, 0, 1 - p, 1);
-};
-var _elm_lang$core$Color$RGBA = F4(
-	function (a, b, c, d) {
-		return {ctor: 'RGBA', _0: a, _1: b, _2: c, _3: d};
-	});
-var _elm_lang$core$Color$rgba = _elm_lang$core$Color$RGBA;
-var _elm_lang$core$Color$rgb = F3(
-	function (r, g, b) {
-		return A4(_elm_lang$core$Color$RGBA, r, g, b, 1);
-	});
-var _elm_lang$core$Color$lightRed = A4(_elm_lang$core$Color$RGBA, 239, 41, 41, 1);
-var _elm_lang$core$Color$red = A4(_elm_lang$core$Color$RGBA, 204, 0, 0, 1);
-var _elm_lang$core$Color$darkRed = A4(_elm_lang$core$Color$RGBA, 164, 0, 0, 1);
-var _elm_lang$core$Color$lightOrange = A4(_elm_lang$core$Color$RGBA, 252, 175, 62, 1);
-var _elm_lang$core$Color$orange = A4(_elm_lang$core$Color$RGBA, 245, 121, 0, 1);
-var _elm_lang$core$Color$darkOrange = A4(_elm_lang$core$Color$RGBA, 206, 92, 0, 1);
-var _elm_lang$core$Color$lightYellow = A4(_elm_lang$core$Color$RGBA, 255, 233, 79, 1);
-var _elm_lang$core$Color$yellow = A4(_elm_lang$core$Color$RGBA, 237, 212, 0, 1);
-var _elm_lang$core$Color$darkYellow = A4(_elm_lang$core$Color$RGBA, 196, 160, 0, 1);
-var _elm_lang$core$Color$lightGreen = A4(_elm_lang$core$Color$RGBA, 138, 226, 52, 1);
-var _elm_lang$core$Color$green = A4(_elm_lang$core$Color$RGBA, 115, 210, 22, 1);
-var _elm_lang$core$Color$darkGreen = A4(_elm_lang$core$Color$RGBA, 78, 154, 6, 1);
-var _elm_lang$core$Color$lightBlue = A4(_elm_lang$core$Color$RGBA, 114, 159, 207, 1);
-var _elm_lang$core$Color$blue = A4(_elm_lang$core$Color$RGBA, 52, 101, 164, 1);
-var _elm_lang$core$Color$darkBlue = A4(_elm_lang$core$Color$RGBA, 32, 74, 135, 1);
-var _elm_lang$core$Color$lightPurple = A4(_elm_lang$core$Color$RGBA, 173, 127, 168, 1);
-var _elm_lang$core$Color$purple = A4(_elm_lang$core$Color$RGBA, 117, 80, 123, 1);
-var _elm_lang$core$Color$darkPurple = A4(_elm_lang$core$Color$RGBA, 92, 53, 102, 1);
-var _elm_lang$core$Color$lightBrown = A4(_elm_lang$core$Color$RGBA, 233, 185, 110, 1);
-var _elm_lang$core$Color$brown = A4(_elm_lang$core$Color$RGBA, 193, 125, 17, 1);
-var _elm_lang$core$Color$darkBrown = A4(_elm_lang$core$Color$RGBA, 143, 89, 2, 1);
-var _elm_lang$core$Color$black = A4(_elm_lang$core$Color$RGBA, 0, 0, 0, 1);
-var _elm_lang$core$Color$white = A4(_elm_lang$core$Color$RGBA, 255, 255, 255, 1);
-var _elm_lang$core$Color$lightGrey = A4(_elm_lang$core$Color$RGBA, 238, 238, 236, 1);
-var _elm_lang$core$Color$grey = A4(_elm_lang$core$Color$RGBA, 211, 215, 207, 1);
-var _elm_lang$core$Color$darkGrey = A4(_elm_lang$core$Color$RGBA, 186, 189, 182, 1);
-var _elm_lang$core$Color$lightGray = A4(_elm_lang$core$Color$RGBA, 238, 238, 236, 1);
-var _elm_lang$core$Color$gray = A4(_elm_lang$core$Color$RGBA, 211, 215, 207, 1);
-var _elm_lang$core$Color$darkGray = A4(_elm_lang$core$Color$RGBA, 186, 189, 182, 1);
-var _elm_lang$core$Color$lightCharcoal = A4(_elm_lang$core$Color$RGBA, 136, 138, 133, 1);
-var _elm_lang$core$Color$charcoal = A4(_elm_lang$core$Color$RGBA, 85, 87, 83, 1);
-var _elm_lang$core$Color$darkCharcoal = A4(_elm_lang$core$Color$RGBA, 46, 52, 54, 1);
-var _elm_lang$core$Color$Radial = F5(
-	function (a, b, c, d, e) {
-		return {ctor: 'Radial', _0: a, _1: b, _2: c, _3: d, _4: e};
-	});
-var _elm_lang$core$Color$radial = _elm_lang$core$Color$Radial;
-var _elm_lang$core$Color$Linear = F3(
-	function (a, b, c) {
-		return {ctor: 'Linear', _0: a, _1: b, _2: c};
-	});
-var _elm_lang$core$Color$linear = _elm_lang$core$Color$Linear;
-
-/*
- * Copyright (c) 2010 Mozilla Corporation
- * Copyright (c) 2010 Vladimir Vukicevic
- *
- * Permission is hereby granted, free of charge, to any person
- * obtaining a copy of this software and associated documentation
- * files (the "Software"), to deal in the Software without
- * restriction, including without limitation the rights to use,
- * copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following
- * conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
- * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
- * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
- * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
- */
-
-/*
- * File: mjs
- *
- * Vector and Matrix math utilities for JavaScript, optimized for WebGL.
- * Edited to work with the Elm Programming Language
- */
-
-var _elm_community$elm_linear_algebra$Native_Math_Vector2 = function() {
-
-    var MJS_FLOAT_ARRAY_TYPE = Float32Array;
-
-    var V2 = { };
-
-    if (MJS_FLOAT_ARRAY_TYPE == Array) {
-        V2.$ = function V2_$(x, y) {
-            return [x, y];
-        };
-    } else {
-        V2.$ = function V2_$(x, y) {
-            return new MJS_FLOAT_ARRAY_TYPE([x, y]);
-        };
-    }
-
-    V2.getX = function V2_getX(a) {
-        return a[0];
-    }
-    V2.getY = function V2_getY(a) {
-        return a[1];
-    }
-    V2.setX = function V2_setX(x, a) {
-        return new MJS_FLOAT_ARRAY_TYPE(x, a[1]);
-    }
-    V2.setY = function V2_setY(y, a) {
-        return new MJS_FLOAT_ARRAY_TYPE(a[0], y);
-    }
-
-    V2.toTuple = function V2_toTuple(a) {
-        return {
-            ctor:"_Tuple2",
-            _0:a[0],
-            _1:a[1]
-        };
-    };
-    V2.fromTuple = function V2_fromTuple(t) {
-        return new MJS_FLOAT_ARRAY_TYPE([t._0, t._1]);
-    };
-
-    V2.toRecord = function V2_toRecord(a) {
-        return {
-            _:{},
-            x:a[0],
-            y:a[1]
-        };
-    };
-    V2.fromRecord = function V2_fromRecord(r) {
-        return new MJS_FLOAT_ARRAY_TYPE([r.x, r.y]);
-    };
-
-    V2.add = function V2_add(a, b) {
-        var r = new MJS_FLOAT_ARRAY_TYPE(2);
-        r[0] = a[0] + b[0];
-        r[1] = a[1] + b[1];
-        return r;
-    };
-
-    V2.sub = function V2_sub(a, b) {
-        var r = new MJS_FLOAT_ARRAY_TYPE(2);
-        r[0] = a[0] - b[0];
-        r[1] = a[1] - b[1];
-        return r;
-    };
-
-    V2.neg = function V2_neg(a) {
-        var r = new MJS_FLOAT_ARRAY_TYPE(2);
-        r[0] = - a[0];
-        r[1] = - a[1];
-        return r;
-    };
-
-    V2.direction = function V2_direction(a, b) {
-        var r = new MJS_FLOAT_ARRAY_TYPE(2);
-        r[0] = a[0] - b[0];
-        r[1] = a[1] - b[1];
-        var im = 1.0 / V2.length(r);
-        r[0] = r[0] * im;
-        r[1] = r[1] * im;
-        return r;
-    };
-
-    V2.length = function V2_length(a) {
-        return Math.sqrt(a[0]*a[0] + a[1]*a[1]);
-    };
-
-    V2.lengthSquared = function V2_lengthSquared(a) {
-        return a[0]*a[0] + a[1]*a[1];
-    };
-
-    V2.distance = function V2_distance(a, b) {
-        var dx = a[0] - b[0];
-        var dy = a[1] - b[1];
-        return Math.sqrt(dx * dx + dy * dy);
-    };
-
-    V2.distanceSquared = function V2_distanceSquared(a, b) {
-        var dx = a[0] - b[0];
-        var dy = a[1] - b[1];
-        return dx * dx + dy * dy;
-    };
-
-    V2.normalize = function V2_normalize(a) {
-        var r = new MJS_FLOAT_ARRAY_TYPE(2);
-        var im = 1.0 / V2.length(a);
-        r[0] = a[0] * im;
-        r[1] = a[1] * im;
-        return r;
-    };
-
-    V2.scale = function V2_scale(k, a) {
-        var r = new MJS_FLOAT_ARRAY_TYPE(2);
-        r[0] = a[0] * k;
-        r[1] = a[1] * k;
-        return r;
-    };
-
-    V2.dot = function V2_dot(a, b) {
-        return a[0] * b[0] + a[1] * b[1];
-    };
-
-    return {
-        vec2: F2(V2.$),
-        getX: V2.getX,
-        getY: V2.getY,
-        setX: F2(V2.setX),
-        setY: F2(V2.setY),
-        toTuple: V2.toTuple,
-        toRecord: V2.toRecord,
-        fromTuple: V2.fromTuple,
-        fromRecord: V2.fromRecord,
-        add: F2(V2.add),
-        sub: F2(V2.sub),
-        neg: V2.neg,
-        direction: F2(V2.direction),
-        length: V2.length,
-        lengthSquared: V2.lengthSquared,
-        distance: F2(V2.distance),
-        distanceSquared: F2(V2.distanceSquared),
-        normalize: V2.normalize,
-        scale: F2(V2.scale),
-        dot: F2(V2.dot)
-    };
-
-}();
-var _elm_community$elm_linear_algebra$Math_Vector2$dot = _elm_community$elm_linear_algebra$Native_Math_Vector2.dot;
-var _elm_community$elm_linear_algebra$Math_Vector2$scale = _elm_community$elm_linear_algebra$Native_Math_Vector2.scale;
-var _elm_community$elm_linear_algebra$Math_Vector2$normalize = _elm_community$elm_linear_algebra$Native_Math_Vector2.normalize;
-var _elm_community$elm_linear_algebra$Math_Vector2$distanceSquared = _elm_community$elm_linear_algebra$Native_Math_Vector2.distanceSquared;
-var _elm_community$elm_linear_algebra$Math_Vector2$distance = _elm_community$elm_linear_algebra$Native_Math_Vector2.distance;
-var _elm_community$elm_linear_algebra$Math_Vector2$lengthSquared = _elm_community$elm_linear_algebra$Native_Math_Vector2.lengthSquared;
-var _elm_community$elm_linear_algebra$Math_Vector2$length = _elm_community$elm_linear_algebra$Native_Math_Vector2.length;
-var _elm_community$elm_linear_algebra$Math_Vector2$direction = _elm_community$elm_linear_algebra$Native_Math_Vector2.direction;
-var _elm_community$elm_linear_algebra$Math_Vector2$negate = _elm_community$elm_linear_algebra$Native_Math_Vector2.neg;
-var _elm_community$elm_linear_algebra$Math_Vector2$sub = _elm_community$elm_linear_algebra$Native_Math_Vector2.sub;
-var _elm_community$elm_linear_algebra$Math_Vector2$add = _elm_community$elm_linear_algebra$Native_Math_Vector2.add;
-var _elm_community$elm_linear_algebra$Math_Vector2$fromRecord = _elm_community$elm_linear_algebra$Native_Math_Vector2.fromRecord;
-var _elm_community$elm_linear_algebra$Math_Vector2$fromTuple = _elm_community$elm_linear_algebra$Native_Math_Vector2.fromTuple;
-var _elm_community$elm_linear_algebra$Math_Vector2$toRecord = _elm_community$elm_linear_algebra$Native_Math_Vector2.toRecord;
-var _elm_community$elm_linear_algebra$Math_Vector2$toTuple = _elm_community$elm_linear_algebra$Native_Math_Vector2.toTuple;
-var _elm_community$elm_linear_algebra$Math_Vector2$setY = _elm_community$elm_linear_algebra$Native_Math_Vector2.setY;
-var _elm_community$elm_linear_algebra$Math_Vector2$setX = _elm_community$elm_linear_algebra$Native_Math_Vector2.setX;
-var _elm_community$elm_linear_algebra$Math_Vector2$getY = _elm_community$elm_linear_algebra$Native_Math_Vector2.getY;
-var _elm_community$elm_linear_algebra$Math_Vector2$getX = _elm_community$elm_linear_algebra$Native_Math_Vector2.getX;
-var _elm_community$elm_linear_algebra$Math_Vector2$vec2 = _elm_community$elm_linear_algebra$Native_Math_Vector2.vec2;
-var _elm_community$elm_linear_algebra$Math_Vector2$Vec2 = {ctor: 'Vec2'};
-var _elm_lang$svg$Svg$text = _elm_lang$virtual_dom$VirtualDom$text;
-var _elm_lang$svg$Svg$svgNamespace = A2(
-	_elm_lang$virtual_dom$VirtualDom$property,
-	'namespace',
-	_elm_lang$core$Json_Encode$string('http://www.w3.org/2000/svg'));
-var _elm_lang$svg$Svg$node = F3(
-	function (name, attributes, children) {
-		return A3(
-			_elm_lang$virtual_dom$VirtualDom$node,
-			name,
-			A2(_elm_lang$core$List_ops['::'], _elm_lang$svg$Svg$svgNamespace, attributes),
-			children);
-	});
-var _elm_lang$svg$Svg$svg = _elm_lang$svg$Svg$node('svg');
-var _elm_lang$svg$Svg$foreignObject = _elm_lang$svg$Svg$node('foreignObject');
-var _elm_lang$svg$Svg$animate = _elm_lang$svg$Svg$node('animate');
-var _elm_lang$svg$Svg$animateColor = _elm_lang$svg$Svg$node('animateColor');
-var _elm_lang$svg$Svg$animateMotion = _elm_lang$svg$Svg$node('animateMotion');
-var _elm_lang$svg$Svg$animateTransform = _elm_lang$svg$Svg$node('animateTransform');
-var _elm_lang$svg$Svg$mpath = _elm_lang$svg$Svg$node('mpath');
-var _elm_lang$svg$Svg$set = _elm_lang$svg$Svg$node('set');
-var _elm_lang$svg$Svg$a = _elm_lang$svg$Svg$node('a');
-var _elm_lang$svg$Svg$defs = _elm_lang$svg$Svg$node('defs');
-var _elm_lang$svg$Svg$g = _elm_lang$svg$Svg$node('g');
-var _elm_lang$svg$Svg$marker = _elm_lang$svg$Svg$node('marker');
-var _elm_lang$svg$Svg$mask = _elm_lang$svg$Svg$node('mask');
-var _elm_lang$svg$Svg$missingGlyph = _elm_lang$svg$Svg$node('missingGlyph');
-var _elm_lang$svg$Svg$pattern = _elm_lang$svg$Svg$node('pattern');
-var _elm_lang$svg$Svg$switch = _elm_lang$svg$Svg$node('switch');
-var _elm_lang$svg$Svg$symbol = _elm_lang$svg$Svg$node('symbol');
-var _elm_lang$svg$Svg$desc = _elm_lang$svg$Svg$node('desc');
-var _elm_lang$svg$Svg$metadata = _elm_lang$svg$Svg$node('metadata');
-var _elm_lang$svg$Svg$title = _elm_lang$svg$Svg$node('title');
-var _elm_lang$svg$Svg$feBlend = _elm_lang$svg$Svg$node('feBlend');
-var _elm_lang$svg$Svg$feColorMatrix = _elm_lang$svg$Svg$node('feColorMatrix');
-var _elm_lang$svg$Svg$feComponentTransfer = _elm_lang$svg$Svg$node('feComponentTransfer');
-var _elm_lang$svg$Svg$feComposite = _elm_lang$svg$Svg$node('feComposite');
-var _elm_lang$svg$Svg$feConvolveMatrix = _elm_lang$svg$Svg$node('feConvolveMatrix');
-var _elm_lang$svg$Svg$feDiffuseLighting = _elm_lang$svg$Svg$node('feDiffuseLighting');
-var _elm_lang$svg$Svg$feDisplacementMap = _elm_lang$svg$Svg$node('feDisplacementMap');
-var _elm_lang$svg$Svg$feFlood = _elm_lang$svg$Svg$node('feFlood');
-var _elm_lang$svg$Svg$feFuncA = _elm_lang$svg$Svg$node('feFuncA');
-var _elm_lang$svg$Svg$feFuncB = _elm_lang$svg$Svg$node('feFuncB');
-var _elm_lang$svg$Svg$feFuncG = _elm_lang$svg$Svg$node('feFuncG');
-var _elm_lang$svg$Svg$feFuncR = _elm_lang$svg$Svg$node('feFuncR');
-var _elm_lang$svg$Svg$feGaussianBlur = _elm_lang$svg$Svg$node('feGaussianBlur');
-var _elm_lang$svg$Svg$feImage = _elm_lang$svg$Svg$node('feImage');
-var _elm_lang$svg$Svg$feMerge = _elm_lang$svg$Svg$node('feMerge');
-var _elm_lang$svg$Svg$feMergeNode = _elm_lang$svg$Svg$node('feMergeNode');
-var _elm_lang$svg$Svg$feMorphology = _elm_lang$svg$Svg$node('feMorphology');
-var _elm_lang$svg$Svg$feOffset = _elm_lang$svg$Svg$node('feOffset');
-var _elm_lang$svg$Svg$feSpecularLighting = _elm_lang$svg$Svg$node('feSpecularLighting');
-var _elm_lang$svg$Svg$feTile = _elm_lang$svg$Svg$node('feTile');
-var _elm_lang$svg$Svg$feTurbulence = _elm_lang$svg$Svg$node('feTurbulence');
-var _elm_lang$svg$Svg$font = _elm_lang$svg$Svg$node('font');
-var _elm_lang$svg$Svg$fontFace = _elm_lang$svg$Svg$node('fontFace');
-var _elm_lang$svg$Svg$fontFaceFormat = _elm_lang$svg$Svg$node('fontFaceFormat');
-var _elm_lang$svg$Svg$fontFaceName = _elm_lang$svg$Svg$node('fontFaceName');
-var _elm_lang$svg$Svg$fontFaceSrc = _elm_lang$svg$Svg$node('fontFaceSrc');
-var _elm_lang$svg$Svg$fontFaceUri = _elm_lang$svg$Svg$node('fontFaceUri');
-var _elm_lang$svg$Svg$hkern = _elm_lang$svg$Svg$node('hkern');
-var _elm_lang$svg$Svg$vkern = _elm_lang$svg$Svg$node('vkern');
-var _elm_lang$svg$Svg$linearGradient = _elm_lang$svg$Svg$node('linearGradient');
-var _elm_lang$svg$Svg$radialGradient = _elm_lang$svg$Svg$node('radialGradient');
-var _elm_lang$svg$Svg$stop = _elm_lang$svg$Svg$node('stop');
-var _elm_lang$svg$Svg$circle = _elm_lang$svg$Svg$node('circle');
-var _elm_lang$svg$Svg$ellipse = _elm_lang$svg$Svg$node('ellipse');
-var _elm_lang$svg$Svg$image = _elm_lang$svg$Svg$node('image');
-var _elm_lang$svg$Svg$line = _elm_lang$svg$Svg$node('line');
-var _elm_lang$svg$Svg$path = _elm_lang$svg$Svg$node('path');
-var _elm_lang$svg$Svg$polygon = _elm_lang$svg$Svg$node('polygon');
-var _elm_lang$svg$Svg$polyline = _elm_lang$svg$Svg$node('polyline');
-var _elm_lang$svg$Svg$rect = _elm_lang$svg$Svg$node('rect');
-var _elm_lang$svg$Svg$use = _elm_lang$svg$Svg$node('use');
-var _elm_lang$svg$Svg$feDistantLight = _elm_lang$svg$Svg$node('feDistantLight');
-var _elm_lang$svg$Svg$fePointLight = _elm_lang$svg$Svg$node('fePointLight');
-var _elm_lang$svg$Svg$feSpotLight = _elm_lang$svg$Svg$node('feSpotLight');
-var _elm_lang$svg$Svg$altGlyph = _elm_lang$svg$Svg$node('altGlyph');
-var _elm_lang$svg$Svg$altGlyphDef = _elm_lang$svg$Svg$node('altGlyphDef');
-var _elm_lang$svg$Svg$altGlyphItem = _elm_lang$svg$Svg$node('altGlyphItem');
-var _elm_lang$svg$Svg$glyph = _elm_lang$svg$Svg$node('glyph');
-var _elm_lang$svg$Svg$glyphRef = _elm_lang$svg$Svg$node('glyphRef');
-var _elm_lang$svg$Svg$textPath = _elm_lang$svg$Svg$node('textPath');
-var _elm_lang$svg$Svg$text$ = _elm_lang$svg$Svg$node('text');
-var _elm_lang$svg$Svg$tref = _elm_lang$svg$Svg$node('tref');
-var _elm_lang$svg$Svg$tspan = _elm_lang$svg$Svg$node('tspan');
-var _elm_lang$svg$Svg$clipPath = _elm_lang$svg$Svg$node('clipPath');
-var _elm_lang$svg$Svg$colorProfile = _elm_lang$svg$Svg$node('colorProfile');
-var _elm_lang$svg$Svg$cursor = _elm_lang$svg$Svg$node('cursor');
-var _elm_lang$svg$Svg$filter = _elm_lang$svg$Svg$node('filter');
-var _elm_lang$svg$Svg$script = _elm_lang$svg$Svg$node('script');
-var _elm_lang$svg$Svg$style = _elm_lang$svg$Svg$node('style');
-var _elm_lang$svg$Svg$view = _elm_lang$svg$Svg$node('view');
-var _ManuScriptHub$elm_diagram$Extra_Cmd$updateOne = F3(
-	function (update, msg, _p0) {
-		var _p1 = _p0;
-		var _p2 = A2(update, msg, _p1._0);
-		var next = _p2._0;
-		var nextEffect = _p2._1;
-		return A2(
-			_elm_lang$core$Platform_Cmd_ops['!'],
-			next,
-			_elm_lang$core$Native_List.fromArray(
-				[_p1._1, nextEffect]));
-	});
-var _ManuScriptHub$elm_diagram$Extra_Cmd$updateMany = F3(
-	function (msgs, update, modelCmd) {
-		return A3(
-			_elm_lang$core$List$foldl,
-			_ManuScriptHub$elm_diagram$Extra_Cmd$updateOne(update),
-			modelCmd,
-			msgs);
-	});
-var _ManuScriptHub$elm_diagram$Extra_Cmd$noFx = function (m) {
-	return {ctor: '_Tuple2', _0: m, _1: _elm_lang$core$Platform_Cmd$none};
-};
-var _elm_lang$svg$Svg_Attributes$writingMode = _elm_lang$virtual_dom$VirtualDom$attribute('writing-mode');
-var _elm_lang$svg$Svg_Attributes$wordSpacing = _elm_lang$virtual_dom$VirtualDom$attribute('word-spacing');
-var _elm_lang$svg$Svg_Attributes$visibility = _elm_lang$virtual_dom$VirtualDom$attribute('visibility');
-var _elm_lang$svg$Svg_Attributes$unicodeBidi = _elm_lang$virtual_dom$VirtualDom$attribute('unicode-bidi');
-var _elm_lang$svg$Svg_Attributes$textRendering = _elm_lang$virtual_dom$VirtualDom$attribute('text-rendering');
-var _elm_lang$svg$Svg_Attributes$textDecoration = _elm_lang$virtual_dom$VirtualDom$attribute('text-decoration');
-var _elm_lang$svg$Svg_Attributes$textAnchor = _elm_lang$virtual_dom$VirtualDom$attribute('text-anchor');
-var _elm_lang$svg$Svg_Attributes$stroke = _elm_lang$virtual_dom$VirtualDom$attribute('stroke');
-var _elm_lang$svg$Svg_Attributes$strokeWidth = _elm_lang$virtual_dom$VirtualDom$attribute('stroke-width');
-var _elm_lang$svg$Svg_Attributes$strokeOpacity = _elm_lang$virtual_dom$VirtualDom$attribute('stroke-opacity');
-var _elm_lang$svg$Svg_Attributes$strokeMiterlimit = _elm_lang$virtual_dom$VirtualDom$attribute('stroke-miterlimit');
-var _elm_lang$svg$Svg_Attributes$strokeLinejoin = _elm_lang$virtual_dom$VirtualDom$attribute('stroke-linejoin');
-var _elm_lang$svg$Svg_Attributes$strokeLinecap = _elm_lang$virtual_dom$VirtualDom$attribute('stroke-linecap');
-var _elm_lang$svg$Svg_Attributes$strokeDashoffset = _elm_lang$virtual_dom$VirtualDom$attribute('stroke-dashoffset');
-var _elm_lang$svg$Svg_Attributes$strokeDasharray = _elm_lang$virtual_dom$VirtualDom$attribute('stroke-dasharray');
-var _elm_lang$svg$Svg_Attributes$stopOpacity = _elm_lang$virtual_dom$VirtualDom$attribute('stop-opacity');
-var _elm_lang$svg$Svg_Attributes$stopColor = _elm_lang$virtual_dom$VirtualDom$attribute('stop-color');
-var _elm_lang$svg$Svg_Attributes$shapeRendering = _elm_lang$virtual_dom$VirtualDom$attribute('shape-rendering');
-var _elm_lang$svg$Svg_Attributes$pointerEvents = _elm_lang$virtual_dom$VirtualDom$attribute('pointer-events');
-var _elm_lang$svg$Svg_Attributes$overflow = _elm_lang$virtual_dom$VirtualDom$attribute('overflow');
-var _elm_lang$svg$Svg_Attributes$opacity = _elm_lang$virtual_dom$VirtualDom$attribute('opacity');
-var _elm_lang$svg$Svg_Attributes$mask = _elm_lang$virtual_dom$VirtualDom$attribute('mask');
-var _elm_lang$svg$Svg_Attributes$markerStart = _elm_lang$virtual_dom$VirtualDom$attribute('marker-start');
-var _elm_lang$svg$Svg_Attributes$markerMid = _elm_lang$virtual_dom$VirtualDom$attribute('marker-mid');
-var _elm_lang$svg$Svg_Attributes$markerEnd = _elm_lang$virtual_dom$VirtualDom$attribute('marker-end');
-var _elm_lang$svg$Svg_Attributes$lightingColor = _elm_lang$virtual_dom$VirtualDom$attribute('lighting-color');
-var _elm_lang$svg$Svg_Attributes$letterSpacing = _elm_lang$virtual_dom$VirtualDom$attribute('letter-spacing');
-var _elm_lang$svg$Svg_Attributes$kerning = _elm_lang$virtual_dom$VirtualDom$attribute('kerning');
-var _elm_lang$svg$Svg_Attributes$imageRendering = _elm_lang$virtual_dom$VirtualDom$attribute('image-rendering');
-var _elm_lang$svg$Svg_Attributes$glyphOrientationVertical = _elm_lang$virtual_dom$VirtualDom$attribute('glyph-orientation-vertical');
-var _elm_lang$svg$Svg_Attributes$glyphOrientationHorizontal = _elm_lang$virtual_dom$VirtualDom$attribute('glyph-orientation-horizontal');
-var _elm_lang$svg$Svg_Attributes$fontWeight = _elm_lang$virtual_dom$VirtualDom$attribute('font-weight');
-var _elm_lang$svg$Svg_Attributes$fontVariant = _elm_lang$virtual_dom$VirtualDom$attribute('font-variant');
-var _elm_lang$svg$Svg_Attributes$fontStyle = _elm_lang$virtual_dom$VirtualDom$attribute('font-style');
-var _elm_lang$svg$Svg_Attributes$fontStretch = _elm_lang$virtual_dom$VirtualDom$attribute('font-stretch');
-var _elm_lang$svg$Svg_Attributes$fontSize = _elm_lang$virtual_dom$VirtualDom$attribute('font-size');
-var _elm_lang$svg$Svg_Attributes$fontSizeAdjust = _elm_lang$virtual_dom$VirtualDom$attribute('font-size-adjust');
-var _elm_lang$svg$Svg_Attributes$fontFamily = _elm_lang$virtual_dom$VirtualDom$attribute('font-family');
-var _elm_lang$svg$Svg_Attributes$floodOpacity = _elm_lang$virtual_dom$VirtualDom$attribute('flood-opacity');
-var _elm_lang$svg$Svg_Attributes$floodColor = _elm_lang$virtual_dom$VirtualDom$attribute('flood-color');
-var _elm_lang$svg$Svg_Attributes$filter = _elm_lang$virtual_dom$VirtualDom$attribute('filter');
-var _elm_lang$svg$Svg_Attributes$fill = _elm_lang$virtual_dom$VirtualDom$attribute('fill');
-var _elm_lang$svg$Svg_Attributes$fillRule = _elm_lang$virtual_dom$VirtualDom$attribute('fill-rule');
-var _elm_lang$svg$Svg_Attributes$fillOpacity = _elm_lang$virtual_dom$VirtualDom$attribute('fill-opacity');
-var _elm_lang$svg$Svg_Attributes$enableBackground = _elm_lang$virtual_dom$VirtualDom$attribute('enable-background');
-var _elm_lang$svg$Svg_Attributes$dominantBaseline = _elm_lang$virtual_dom$VirtualDom$attribute('dominant-baseline');
-var _elm_lang$svg$Svg_Attributes$display = _elm_lang$virtual_dom$VirtualDom$attribute('display');
-var _elm_lang$svg$Svg_Attributes$direction = _elm_lang$virtual_dom$VirtualDom$attribute('direction');
-var _elm_lang$svg$Svg_Attributes$cursor = _elm_lang$virtual_dom$VirtualDom$attribute('cursor');
-var _elm_lang$svg$Svg_Attributes$color = _elm_lang$virtual_dom$VirtualDom$attribute('color');
-var _elm_lang$svg$Svg_Attributes$colorRendering = _elm_lang$virtual_dom$VirtualDom$attribute('color-rendering');
-var _elm_lang$svg$Svg_Attributes$colorProfile = _elm_lang$virtual_dom$VirtualDom$attribute('color-profile');
-var _elm_lang$svg$Svg_Attributes$colorInterpolation = _elm_lang$virtual_dom$VirtualDom$attribute('color-interpolation');
-var _elm_lang$svg$Svg_Attributes$colorInterpolationFilters = _elm_lang$virtual_dom$VirtualDom$attribute('color-interpolation-filters');
-var _elm_lang$svg$Svg_Attributes$clip = _elm_lang$virtual_dom$VirtualDom$attribute('clip');
-var _elm_lang$svg$Svg_Attributes$clipRule = _elm_lang$virtual_dom$VirtualDom$attribute('clip-rule');
-var _elm_lang$svg$Svg_Attributes$clipPath = _elm_lang$virtual_dom$VirtualDom$attribute('clip-path');
-var _elm_lang$svg$Svg_Attributes$baselineShift = _elm_lang$virtual_dom$VirtualDom$attribute('baseline-shift');
-var _elm_lang$svg$Svg_Attributes$alignmentBaseline = _elm_lang$virtual_dom$VirtualDom$attribute('alignment-baseline');
-var _elm_lang$svg$Svg_Attributes$zoomAndPan = _elm_lang$virtual_dom$VirtualDom$attribute('zoomAndPan');
-var _elm_lang$svg$Svg_Attributes$z = _elm_lang$virtual_dom$VirtualDom$attribute('z');
-var _elm_lang$svg$Svg_Attributes$yChannelSelector = _elm_lang$virtual_dom$VirtualDom$attribute('yChannelSelector');
-var _elm_lang$svg$Svg_Attributes$y2 = _elm_lang$virtual_dom$VirtualDom$attribute('y2');
-var _elm_lang$svg$Svg_Attributes$y1 = _elm_lang$virtual_dom$VirtualDom$attribute('y1');
-var _elm_lang$svg$Svg_Attributes$y = _elm_lang$virtual_dom$VirtualDom$attribute('y');
-var _elm_lang$svg$Svg_Attributes$xmlSpace = A2(_elm_lang$virtual_dom$VirtualDom$attributeNS, 'http://www.w3.org/XML/1998/namespace', 'xml:space');
-var _elm_lang$svg$Svg_Attributes$xmlLang = A2(_elm_lang$virtual_dom$VirtualDom$attributeNS, 'http://www.w3.org/XML/1998/namespace', 'xml:lang');
-var _elm_lang$svg$Svg_Attributes$xmlBase = A2(_elm_lang$virtual_dom$VirtualDom$attributeNS, 'http://www.w3.org/XML/1998/namespace', 'xml:base');
-var _elm_lang$svg$Svg_Attributes$xlinkType = A2(_elm_lang$virtual_dom$VirtualDom$attributeNS, 'http://www.w3.org/1999/xlink', 'xlink:type');
-var _elm_lang$svg$Svg_Attributes$xlinkTitle = A2(_elm_lang$virtual_dom$VirtualDom$attributeNS, 'http://www.w3.org/1999/xlink', 'xlink:title');
-var _elm_lang$svg$Svg_Attributes$xlinkShow = A2(_elm_lang$virtual_dom$VirtualDom$attributeNS, 'http://www.w3.org/1999/xlink', 'xlink:show');
-var _elm_lang$svg$Svg_Attributes$xlinkRole = A2(_elm_lang$virtual_dom$VirtualDom$attributeNS, 'http://www.w3.org/1999/xlink', 'xlink:role');
-var _elm_lang$svg$Svg_Attributes$xlinkHref = A2(_elm_lang$virtual_dom$VirtualDom$attributeNS, 'http://www.w3.org/1999/xlink', 'xlink:href');
-var _elm_lang$svg$Svg_Attributes$xlinkArcrole = A2(_elm_lang$virtual_dom$VirtualDom$attributeNS, 'http://www.w3.org/1999/xlink', 'xlink:arcrole');
-var _elm_lang$svg$Svg_Attributes$xlinkActuate = A2(_elm_lang$virtual_dom$VirtualDom$attributeNS, 'http://www.w3.org/1999/xlink', 'xlink:actuate');
-var _elm_lang$svg$Svg_Attributes$xChannelSelector = _elm_lang$virtual_dom$VirtualDom$attribute('xChannelSelector');
-var _elm_lang$svg$Svg_Attributes$x2 = _elm_lang$virtual_dom$VirtualDom$attribute('x2');
-var _elm_lang$svg$Svg_Attributes$x1 = _elm_lang$virtual_dom$VirtualDom$attribute('x1');
-var _elm_lang$svg$Svg_Attributes$xHeight = _elm_lang$virtual_dom$VirtualDom$attribute('x-height');
-var _elm_lang$svg$Svg_Attributes$x = _elm_lang$virtual_dom$VirtualDom$attribute('x');
-var _elm_lang$svg$Svg_Attributes$widths = _elm_lang$virtual_dom$VirtualDom$attribute('widths');
-var _elm_lang$svg$Svg_Attributes$width = _elm_lang$virtual_dom$VirtualDom$attribute('width');
-var _elm_lang$svg$Svg_Attributes$viewTarget = _elm_lang$virtual_dom$VirtualDom$attribute('viewTarget');
-var _elm_lang$svg$Svg_Attributes$viewBox = _elm_lang$virtual_dom$VirtualDom$attribute('viewBox');
-var _elm_lang$svg$Svg_Attributes$vertOriginY = _elm_lang$virtual_dom$VirtualDom$attribute('vert-origin-y');
-var _elm_lang$svg$Svg_Attributes$vertOriginX = _elm_lang$virtual_dom$VirtualDom$attribute('vert-origin-x');
-var _elm_lang$svg$Svg_Attributes$vertAdvY = _elm_lang$virtual_dom$VirtualDom$attribute('vert-adv-y');
-var _elm_lang$svg$Svg_Attributes$version = _elm_lang$virtual_dom$VirtualDom$attribute('version');
-var _elm_lang$svg$Svg_Attributes$values = _elm_lang$virtual_dom$VirtualDom$attribute('values');
-var _elm_lang$svg$Svg_Attributes$vMathematical = _elm_lang$virtual_dom$VirtualDom$attribute('v-mathematical');
-var _elm_lang$svg$Svg_Attributes$vIdeographic = _elm_lang$virtual_dom$VirtualDom$attribute('v-ideographic');
-var _elm_lang$svg$Svg_Attributes$vHanging = _elm_lang$virtual_dom$VirtualDom$attribute('v-hanging');
-var _elm_lang$svg$Svg_Attributes$vAlphabetic = _elm_lang$virtual_dom$VirtualDom$attribute('v-alphabetic');
-var _elm_lang$svg$Svg_Attributes$unitsPerEm = _elm_lang$virtual_dom$VirtualDom$attribute('units-per-em');
-var _elm_lang$svg$Svg_Attributes$unicodeRange = _elm_lang$virtual_dom$VirtualDom$attribute('unicode-range');
-var _elm_lang$svg$Svg_Attributes$unicode = _elm_lang$virtual_dom$VirtualDom$attribute('unicode');
-var _elm_lang$svg$Svg_Attributes$underlineThickness = _elm_lang$virtual_dom$VirtualDom$attribute('underline-thickness');
-var _elm_lang$svg$Svg_Attributes$underlinePosition = _elm_lang$virtual_dom$VirtualDom$attribute('underline-position');
-var _elm_lang$svg$Svg_Attributes$u2 = _elm_lang$virtual_dom$VirtualDom$attribute('u2');
-var _elm_lang$svg$Svg_Attributes$u1 = _elm_lang$virtual_dom$VirtualDom$attribute('u1');
-var _elm_lang$svg$Svg_Attributes$type$ = _elm_lang$virtual_dom$VirtualDom$attribute('type');
-var _elm_lang$svg$Svg_Attributes$transform = _elm_lang$virtual_dom$VirtualDom$attribute('transform');
-var _elm_lang$svg$Svg_Attributes$to = _elm_lang$virtual_dom$VirtualDom$attribute('to');
-var _elm_lang$svg$Svg_Attributes$title = _elm_lang$virtual_dom$VirtualDom$attribute('title');
-var _elm_lang$svg$Svg_Attributes$textLength = _elm_lang$virtual_dom$VirtualDom$attribute('textLength');
-var _elm_lang$svg$Svg_Attributes$targetY = _elm_lang$virtual_dom$VirtualDom$attribute('targetY');
-var _elm_lang$svg$Svg_Attributes$targetX = _elm_lang$virtual_dom$VirtualDom$attribute('targetX');
-var _elm_lang$svg$Svg_Attributes$target = _elm_lang$virtual_dom$VirtualDom$attribute('target');
-var _elm_lang$svg$Svg_Attributes$tableValues = _elm_lang$virtual_dom$VirtualDom$attribute('tableValues');
-var _elm_lang$svg$Svg_Attributes$systemLanguage = _elm_lang$virtual_dom$VirtualDom$attribute('systemLanguage');
-var _elm_lang$svg$Svg_Attributes$surfaceScale = _elm_lang$virtual_dom$VirtualDom$attribute('surfaceScale');
-var _elm_lang$svg$Svg_Attributes$style = _elm_lang$virtual_dom$VirtualDom$attribute('style');
-var _elm_lang$svg$Svg_Attributes$string = _elm_lang$virtual_dom$VirtualDom$attribute('string');
-var _elm_lang$svg$Svg_Attributes$strikethroughThickness = _elm_lang$virtual_dom$VirtualDom$attribute('strikethrough-thickness');
-var _elm_lang$svg$Svg_Attributes$strikethroughPosition = _elm_lang$virtual_dom$VirtualDom$attribute('strikethrough-position');
-var _elm_lang$svg$Svg_Attributes$stitchTiles = _elm_lang$virtual_dom$VirtualDom$attribute('stitchTiles');
-var _elm_lang$svg$Svg_Attributes$stemv = _elm_lang$virtual_dom$VirtualDom$attribute('stemv');
-var _elm_lang$svg$Svg_Attributes$stemh = _elm_lang$virtual_dom$VirtualDom$attribute('stemh');
-var _elm_lang$svg$Svg_Attributes$stdDeviation = _elm_lang$virtual_dom$VirtualDom$attribute('stdDeviation');
-var _elm_lang$svg$Svg_Attributes$startOffset = _elm_lang$virtual_dom$VirtualDom$attribute('startOffset');
-var _elm_lang$svg$Svg_Attributes$spreadMethod = _elm_lang$virtual_dom$VirtualDom$attribute('spreadMethod');
-var _elm_lang$svg$Svg_Attributes$speed = _elm_lang$virtual_dom$VirtualDom$attribute('speed');
-var _elm_lang$svg$Svg_Attributes$specularExponent = _elm_lang$virtual_dom$VirtualDom$attribute('specularExponent');
-var _elm_lang$svg$Svg_Attributes$specularConstant = _elm_lang$virtual_dom$VirtualDom$attribute('specularConstant');
-var _elm_lang$svg$Svg_Attributes$spacing = _elm_lang$virtual_dom$VirtualDom$attribute('spacing');
-var _elm_lang$svg$Svg_Attributes$slope = _elm_lang$virtual_dom$VirtualDom$attribute('slope');
-var _elm_lang$svg$Svg_Attributes$seed = _elm_lang$virtual_dom$VirtualDom$attribute('seed');
-var _elm_lang$svg$Svg_Attributes$scale = _elm_lang$virtual_dom$VirtualDom$attribute('scale');
-var _elm_lang$svg$Svg_Attributes$ry = _elm_lang$virtual_dom$VirtualDom$attribute('ry');
-var _elm_lang$svg$Svg_Attributes$rx = _elm_lang$virtual_dom$VirtualDom$attribute('rx');
-var _elm_lang$svg$Svg_Attributes$rotate = _elm_lang$virtual_dom$VirtualDom$attribute('rotate');
-var _elm_lang$svg$Svg_Attributes$result = _elm_lang$virtual_dom$VirtualDom$attribute('result');
-var _elm_lang$svg$Svg_Attributes$restart = _elm_lang$virtual_dom$VirtualDom$attribute('restart');
-var _elm_lang$svg$Svg_Attributes$requiredFeatures = _elm_lang$virtual_dom$VirtualDom$attribute('requiredFeatures');
-var _elm_lang$svg$Svg_Attributes$requiredExtensions = _elm_lang$virtual_dom$VirtualDom$attribute('requiredExtensions');
-var _elm_lang$svg$Svg_Attributes$repeatDur = _elm_lang$virtual_dom$VirtualDom$attribute('repeatDur');
-var _elm_lang$svg$Svg_Attributes$repeatCount = _elm_lang$virtual_dom$VirtualDom$attribute('repeatCount');
-var _elm_lang$svg$Svg_Attributes$renderingIntent = _elm_lang$virtual_dom$VirtualDom$attribute('rendering-intent');
-var _elm_lang$svg$Svg_Attributes$refY = _elm_lang$virtual_dom$VirtualDom$attribute('refY');
-var _elm_lang$svg$Svg_Attributes$refX = _elm_lang$virtual_dom$VirtualDom$attribute('refX');
-var _elm_lang$svg$Svg_Attributes$radius = _elm_lang$virtual_dom$VirtualDom$attribute('radius');
-var _elm_lang$svg$Svg_Attributes$r = _elm_lang$virtual_dom$VirtualDom$attribute('r');
-var _elm_lang$svg$Svg_Attributes$primitiveUnits = _elm_lang$virtual_dom$VirtualDom$attribute('primitiveUnits');
-var _elm_lang$svg$Svg_Attributes$preserveAspectRatio = _elm_lang$virtual_dom$VirtualDom$attribute('preserveAspectRatio');
-var _elm_lang$svg$Svg_Attributes$preserveAlpha = _elm_lang$virtual_dom$VirtualDom$attribute('preserveAlpha');
-var _elm_lang$svg$Svg_Attributes$pointsAtZ = _elm_lang$virtual_dom$VirtualDom$attribute('pointsAtZ');
-var _elm_lang$svg$Svg_Attributes$pointsAtY = _elm_lang$virtual_dom$VirtualDom$attribute('pointsAtY');
-var _elm_lang$svg$Svg_Attributes$pointsAtX = _elm_lang$virtual_dom$VirtualDom$attribute('pointsAtX');
-var _elm_lang$svg$Svg_Attributes$points = _elm_lang$virtual_dom$VirtualDom$attribute('points');
-var _elm_lang$svg$Svg_Attributes$pointOrder = _elm_lang$virtual_dom$VirtualDom$attribute('point-order');
-var _elm_lang$svg$Svg_Attributes$patternUnits = _elm_lang$virtual_dom$VirtualDom$attribute('patternUnits');
-var _elm_lang$svg$Svg_Attributes$patternTransform = _elm_lang$virtual_dom$VirtualDom$attribute('patternTransform');
-var _elm_lang$svg$Svg_Attributes$patternContentUnits = _elm_lang$virtual_dom$VirtualDom$attribute('patternContentUnits');
-var _elm_lang$svg$Svg_Attributes$pathLength = _elm_lang$virtual_dom$VirtualDom$attribute('pathLength');
-var _elm_lang$svg$Svg_Attributes$path = _elm_lang$virtual_dom$VirtualDom$attribute('path');
-var _elm_lang$svg$Svg_Attributes$panose1 = _elm_lang$virtual_dom$VirtualDom$attribute('panose-1');
-var _elm_lang$svg$Svg_Attributes$overlineThickness = _elm_lang$virtual_dom$VirtualDom$attribute('overline-thickness');
-var _elm_lang$svg$Svg_Attributes$overlinePosition = _elm_lang$virtual_dom$VirtualDom$attribute('overline-position');
-var _elm_lang$svg$Svg_Attributes$origin = _elm_lang$virtual_dom$VirtualDom$attribute('origin');
-var _elm_lang$svg$Svg_Attributes$orientation = _elm_lang$virtual_dom$VirtualDom$attribute('orientation');
-var _elm_lang$svg$Svg_Attributes$orient = _elm_lang$virtual_dom$VirtualDom$attribute('orient');
-var _elm_lang$svg$Svg_Attributes$order = _elm_lang$virtual_dom$VirtualDom$attribute('order');
-var _elm_lang$svg$Svg_Attributes$operator = _elm_lang$virtual_dom$VirtualDom$attribute('operator');
-var _elm_lang$svg$Svg_Attributes$offset = _elm_lang$virtual_dom$VirtualDom$attribute('offset');
-var _elm_lang$svg$Svg_Attributes$numOctaves = _elm_lang$virtual_dom$VirtualDom$attribute('numOctaves');
-var _elm_lang$svg$Svg_Attributes$name = _elm_lang$virtual_dom$VirtualDom$attribute('name');
-var _elm_lang$svg$Svg_Attributes$mode = _elm_lang$virtual_dom$VirtualDom$attribute('mode');
-var _elm_lang$svg$Svg_Attributes$min = _elm_lang$virtual_dom$VirtualDom$attribute('min');
-var _elm_lang$svg$Svg_Attributes$method = _elm_lang$virtual_dom$VirtualDom$attribute('method');
-var _elm_lang$svg$Svg_Attributes$media = _elm_lang$virtual_dom$VirtualDom$attribute('media');
-var _elm_lang$svg$Svg_Attributes$max = _elm_lang$virtual_dom$VirtualDom$attribute('max');
-var _elm_lang$svg$Svg_Attributes$mathematical = _elm_lang$virtual_dom$VirtualDom$attribute('mathematical');
-var _elm_lang$svg$Svg_Attributes$maskUnits = _elm_lang$virtual_dom$VirtualDom$attribute('maskUnits');
-var _elm_lang$svg$Svg_Attributes$maskContentUnits = _elm_lang$virtual_dom$VirtualDom$attribute('maskContentUnits');
-var _elm_lang$svg$Svg_Attributes$markerWidth = _elm_lang$virtual_dom$VirtualDom$attribute('markerWidth');
-var _elm_lang$svg$Svg_Attributes$markerUnits = _elm_lang$virtual_dom$VirtualDom$attribute('markerUnits');
-var _elm_lang$svg$Svg_Attributes$markerHeight = _elm_lang$virtual_dom$VirtualDom$attribute('markerHeight');
-var _elm_lang$svg$Svg_Attributes$local = _elm_lang$virtual_dom$VirtualDom$attribute('local');
-var _elm_lang$svg$Svg_Attributes$limitingConeAngle = _elm_lang$virtual_dom$VirtualDom$attribute('limitingConeAngle');
-var _elm_lang$svg$Svg_Attributes$lengthAdjust = _elm_lang$virtual_dom$VirtualDom$attribute('lengthAdjust');
-var _elm_lang$svg$Svg_Attributes$lang = _elm_lang$virtual_dom$VirtualDom$attribute('lang');
-var _elm_lang$svg$Svg_Attributes$keyTimes = _elm_lang$virtual_dom$VirtualDom$attribute('keyTimes');
-var _elm_lang$svg$Svg_Attributes$keySplines = _elm_lang$virtual_dom$VirtualDom$attribute('keySplines');
-var _elm_lang$svg$Svg_Attributes$keyPoints = _elm_lang$virtual_dom$VirtualDom$attribute('keyPoints');
-var _elm_lang$svg$Svg_Attributes$kernelUnitLength = _elm_lang$virtual_dom$VirtualDom$attribute('kernelUnitLength');
-var _elm_lang$svg$Svg_Attributes$kernelMatrix = _elm_lang$virtual_dom$VirtualDom$attribute('kernelMatrix');
-var _elm_lang$svg$Svg_Attributes$k4 = _elm_lang$virtual_dom$VirtualDom$attribute('k4');
-var _elm_lang$svg$Svg_Attributes$k3 = _elm_lang$virtual_dom$VirtualDom$attribute('k3');
-var _elm_lang$svg$Svg_Attributes$k2 = _elm_lang$virtual_dom$VirtualDom$attribute('k2');
-var _elm_lang$svg$Svg_Attributes$k1 = _elm_lang$virtual_dom$VirtualDom$attribute('k1');
-var _elm_lang$svg$Svg_Attributes$k = _elm_lang$virtual_dom$VirtualDom$attribute('k');
-var _elm_lang$svg$Svg_Attributes$intercept = _elm_lang$virtual_dom$VirtualDom$attribute('intercept');
-var _elm_lang$svg$Svg_Attributes$in2 = _elm_lang$virtual_dom$VirtualDom$attribute('in2');
-var _elm_lang$svg$Svg_Attributes$in$ = _elm_lang$virtual_dom$VirtualDom$attribute('in');
-var _elm_lang$svg$Svg_Attributes$ideographic = _elm_lang$virtual_dom$VirtualDom$attribute('ideographic');
-var _elm_lang$svg$Svg_Attributes$id = _elm_lang$virtual_dom$VirtualDom$attribute('id');
-var _elm_lang$svg$Svg_Attributes$horizOriginY = _elm_lang$virtual_dom$VirtualDom$attribute('horiz-origin-y');
-var _elm_lang$svg$Svg_Attributes$horizOriginX = _elm_lang$virtual_dom$VirtualDom$attribute('horiz-origin-x');
-var _elm_lang$svg$Svg_Attributes$horizAdvX = _elm_lang$virtual_dom$VirtualDom$attribute('horiz-adv-x');
-var _elm_lang$svg$Svg_Attributes$height = _elm_lang$virtual_dom$VirtualDom$attribute('height');
-var _elm_lang$svg$Svg_Attributes$hanging = _elm_lang$virtual_dom$VirtualDom$attribute('hanging');
-var _elm_lang$svg$Svg_Attributes$gradientUnits = _elm_lang$virtual_dom$VirtualDom$attribute('gradientUnits');
-var _elm_lang$svg$Svg_Attributes$gradientTransform = _elm_lang$virtual_dom$VirtualDom$attribute('gradientTransform');
-var _elm_lang$svg$Svg_Attributes$glyphRef = _elm_lang$virtual_dom$VirtualDom$attribute('glyphRef');
-var _elm_lang$svg$Svg_Attributes$glyphName = _elm_lang$virtual_dom$VirtualDom$attribute('glyph-name');
-var _elm_lang$svg$Svg_Attributes$g2 = _elm_lang$virtual_dom$VirtualDom$attribute('g2');
-var _elm_lang$svg$Svg_Attributes$g1 = _elm_lang$virtual_dom$VirtualDom$attribute('g1');
-var _elm_lang$svg$Svg_Attributes$fy = _elm_lang$virtual_dom$VirtualDom$attribute('fy');
-var _elm_lang$svg$Svg_Attributes$fx = _elm_lang$virtual_dom$VirtualDom$attribute('fx');
-var _elm_lang$svg$Svg_Attributes$from = _elm_lang$virtual_dom$VirtualDom$attribute('from');
-var _elm_lang$svg$Svg_Attributes$format = _elm_lang$virtual_dom$VirtualDom$attribute('format');
-var _elm_lang$svg$Svg_Attributes$filterUnits = _elm_lang$virtual_dom$VirtualDom$attribute('filterUnits');
-var _elm_lang$svg$Svg_Attributes$filterRes = _elm_lang$virtual_dom$VirtualDom$attribute('filterRes');
-var _elm_lang$svg$Svg_Attributes$externalResourcesRequired = _elm_lang$virtual_dom$VirtualDom$attribute('externalResourcesRequired');
-var _elm_lang$svg$Svg_Attributes$exponent = _elm_lang$virtual_dom$VirtualDom$attribute('exponent');
-var _elm_lang$svg$Svg_Attributes$end = _elm_lang$virtual_dom$VirtualDom$attribute('end');
-var _elm_lang$svg$Svg_Attributes$elevation = _elm_lang$virtual_dom$VirtualDom$attribute('elevation');
-var _elm_lang$svg$Svg_Attributes$edgeMode = _elm_lang$virtual_dom$VirtualDom$attribute('edgeMode');
-var _elm_lang$svg$Svg_Attributes$dy = _elm_lang$virtual_dom$VirtualDom$attribute('dy');
-var _elm_lang$svg$Svg_Attributes$dx = _elm_lang$virtual_dom$VirtualDom$attribute('dx');
-var _elm_lang$svg$Svg_Attributes$dur = _elm_lang$virtual_dom$VirtualDom$attribute('dur');
-var _elm_lang$svg$Svg_Attributes$divisor = _elm_lang$virtual_dom$VirtualDom$attribute('divisor');
-var _elm_lang$svg$Svg_Attributes$diffuseConstant = _elm_lang$virtual_dom$VirtualDom$attribute('diffuseConstant');
-var _elm_lang$svg$Svg_Attributes$descent = _elm_lang$virtual_dom$VirtualDom$attribute('descent');
-var _elm_lang$svg$Svg_Attributes$decelerate = _elm_lang$virtual_dom$VirtualDom$attribute('decelerate');
-var _elm_lang$svg$Svg_Attributes$d = _elm_lang$virtual_dom$VirtualDom$attribute('d');
-var _elm_lang$svg$Svg_Attributes$cy = _elm_lang$virtual_dom$VirtualDom$attribute('cy');
-var _elm_lang$svg$Svg_Attributes$cx = _elm_lang$virtual_dom$VirtualDom$attribute('cx');
-var _elm_lang$svg$Svg_Attributes$contentStyleType = _elm_lang$virtual_dom$VirtualDom$attribute('contentStyleType');
-var _elm_lang$svg$Svg_Attributes$contentScriptType = _elm_lang$virtual_dom$VirtualDom$attribute('contentScriptType');
-var _elm_lang$svg$Svg_Attributes$clipPathUnits = _elm_lang$virtual_dom$VirtualDom$attribute('clipPathUnits');
-var _elm_lang$svg$Svg_Attributes$class = _elm_lang$virtual_dom$VirtualDom$attribute('class');
-var _elm_lang$svg$Svg_Attributes$capHeight = _elm_lang$virtual_dom$VirtualDom$attribute('cap-height');
-var _elm_lang$svg$Svg_Attributes$calcMode = _elm_lang$virtual_dom$VirtualDom$attribute('calcMode');
-var _elm_lang$svg$Svg_Attributes$by = _elm_lang$virtual_dom$VirtualDom$attribute('by');
-var _elm_lang$svg$Svg_Attributes$bias = _elm_lang$virtual_dom$VirtualDom$attribute('bias');
-var _elm_lang$svg$Svg_Attributes$begin = _elm_lang$virtual_dom$VirtualDom$attribute('begin');
-var _elm_lang$svg$Svg_Attributes$bbox = _elm_lang$virtual_dom$VirtualDom$attribute('bbox');
-var _elm_lang$svg$Svg_Attributes$baseProfile = _elm_lang$virtual_dom$VirtualDom$attribute('baseProfile');
-var _elm_lang$svg$Svg_Attributes$baseFrequency = _elm_lang$virtual_dom$VirtualDom$attribute('baseFrequency');
-var _elm_lang$svg$Svg_Attributes$azimuth = _elm_lang$virtual_dom$VirtualDom$attribute('azimuth');
-var _elm_lang$svg$Svg_Attributes$autoReverse = _elm_lang$virtual_dom$VirtualDom$attribute('autoReverse');
-var _elm_lang$svg$Svg_Attributes$attributeType = _elm_lang$virtual_dom$VirtualDom$attribute('attributeType');
-var _elm_lang$svg$Svg_Attributes$attributeName = _elm_lang$virtual_dom$VirtualDom$attribute('attributeName');
-var _elm_lang$svg$Svg_Attributes$ascent = _elm_lang$virtual_dom$VirtualDom$attribute('ascent');
-var _elm_lang$svg$Svg_Attributes$arabicForm = _elm_lang$virtual_dom$VirtualDom$attribute('arabic-form');
-var _elm_lang$svg$Svg_Attributes$amplitude = _elm_lang$virtual_dom$VirtualDom$attribute('amplitude');
-var _elm_lang$svg$Svg_Attributes$allowReorder = _elm_lang$virtual_dom$VirtualDom$attribute('allowReorder');
-var _elm_lang$svg$Svg_Attributes$alphabetic = _elm_lang$virtual_dom$VirtualDom$attribute('alphabetic');
-var _elm_lang$svg$Svg_Attributes$additive = _elm_lang$virtual_dom$VirtualDom$attribute('additive');
-var _elm_lang$svg$Svg_Attributes$accumulate = _elm_lang$virtual_dom$VirtualDom$attribute('accumulate');
-var _elm_lang$svg$Svg_Attributes$accelerate = _elm_lang$virtual_dom$VirtualDom$attribute('accelerate');
-var _elm_lang$svg$Svg_Attributes$accentHeight = _elm_lang$virtual_dom$VirtualDom$attribute('accent-height');
-var _elm_lang$svg$Svg_Events$on = _elm_lang$virtual_dom$VirtualDom$on;
-var _elm_lang$svg$Svg_Events$simpleOn = F2(
-	function (name, msg) {
-		return A2(
-			_elm_lang$svg$Svg_Events$on,
-			name,
-			_elm_lang$core$Json_Decode$succeed(msg));
-	});
-var _elm_lang$svg$Svg_Events$onBegin = _elm_lang$svg$Svg_Events$simpleOn('begin');
-var _elm_lang$svg$Svg_Events$onEnd = _elm_lang$svg$Svg_Events$simpleOn('end');
-var _elm_lang$svg$Svg_Events$onRepeat = _elm_lang$svg$Svg_Events$simpleOn('repeat');
-var _elm_lang$svg$Svg_Events$onAbort = _elm_lang$svg$Svg_Events$simpleOn('abort');
-var _elm_lang$svg$Svg_Events$onError = _elm_lang$svg$Svg_Events$simpleOn('error');
-var _elm_lang$svg$Svg_Events$onResize = _elm_lang$svg$Svg_Events$simpleOn('resize');
-var _elm_lang$svg$Svg_Events$onScroll = _elm_lang$svg$Svg_Events$simpleOn('scroll');
-var _elm_lang$svg$Svg_Events$onLoad = _elm_lang$svg$Svg_Events$simpleOn('load');
-var _elm_lang$svg$Svg_Events$onUnload = _elm_lang$svg$Svg_Events$simpleOn('unload');
-var _elm_lang$svg$Svg_Events$onZoom = _elm_lang$svg$Svg_Events$simpleOn('zoom');
-var _elm_lang$svg$Svg_Events$onActivate = _elm_lang$svg$Svg_Events$simpleOn('activate');
-var _elm_lang$svg$Svg_Events$onClick = _elm_lang$svg$Svg_Events$simpleOn('click');
-var _elm_lang$svg$Svg_Events$onFocusIn = _elm_lang$svg$Svg_Events$simpleOn('focusin');
-var _elm_lang$svg$Svg_Events$onFocusOut = _elm_lang$svg$Svg_Events$simpleOn('focusout');
-var _elm_lang$svg$Svg_Events$onMouseDown = _elm_lang$svg$Svg_Events$simpleOn('mousedown');
-var _elm_lang$svg$Svg_Events$onMouseMove = _elm_lang$svg$Svg_Events$simpleOn('mousemove');
-var _elm_lang$svg$Svg_Events$onMouseOut = _elm_lang$svg$Svg_Events$simpleOn('mouseout');
-var _elm_lang$svg$Svg_Events$onMouseOver = _elm_lang$svg$Svg_Events$simpleOn('mouseover');
-var _elm_lang$svg$Svg_Events$onMouseUp = _elm_lang$svg$Svg_Events$simpleOn('mouseup');
-var _fredcy$elm_parseint$ParseInt$charFromInt = function (i) {
-	return (_elm_lang$core$Native_Utils.cmp(i, 10) < 0) ? _elm_lang$core$Char$fromCode(
-		i + _elm_lang$core$Char$toCode(
-			_elm_lang$core$Native_Utils.chr('0'))) : ((_elm_lang$core$Native_Utils.cmp(i, 36) < 0) ? _elm_lang$core$Char$fromCode(
-		(i - 10) + _elm_lang$core$Char$toCode(
-			_elm_lang$core$Native_Utils.chr('A'))) : _elm_lang$core$Native_Utils.crash(
-		'ParseInt',
-		{
-			start: {line: 157, column: 9},
-			end: {line: 157, column: 20}
-		})(
-		_elm_lang$core$Basics$toString(i)));
-};
-var _fredcy$elm_parseint$ParseInt$toRadix$ = F2(
-	function (radix, i) {
-		return (_elm_lang$core$Native_Utils.cmp(i, radix) < 0) ? _elm_lang$core$String$fromChar(
-			_fredcy$elm_parseint$ParseInt$charFromInt(i)) : A2(
-			_elm_lang$core$Basics_ops['++'],
-			A2(_fredcy$elm_parseint$ParseInt$toRadix$, radix, (i / radix) | 0),
-			_elm_lang$core$String$fromChar(
-				_fredcy$elm_parseint$ParseInt$charFromInt(
-					A2(_elm_lang$core$Basics_ops['%'], i, radix))));
-	});
-var _fredcy$elm_parseint$ParseInt$toOct = _fredcy$elm_parseint$ParseInt$toRadix$(8);
-var _fredcy$elm_parseint$ParseInt$toHex = _fredcy$elm_parseint$ParseInt$toRadix$(16);
-var _fredcy$elm_parseint$ParseInt$isBetween = F3(
-	function (lower, upper, c) {
-		var ci = _elm_lang$core$Char$toCode(c);
-		return (_elm_lang$core$Native_Utils.cmp(
-			_elm_lang$core$Char$toCode(lower),
-			ci) < 1) && (_elm_lang$core$Native_Utils.cmp(
-			ci,
-			_elm_lang$core$Char$toCode(upper)) < 1);
-	});
-var _fredcy$elm_parseint$ParseInt$charOffset = F2(
-	function (basis, c) {
-		return _elm_lang$core$Char$toCode(c) - _elm_lang$core$Char$toCode(basis);
-	});
-var _fredcy$elm_parseint$ParseInt$InvalidRadix = function (a) {
-	return {ctor: 'InvalidRadix', _0: a};
-};
-var _fredcy$elm_parseint$ParseInt$toRadix = F2(
-	function (radix, i) {
-		return ((_elm_lang$core$Native_Utils.cmp(2, radix) < 1) && (_elm_lang$core$Native_Utils.cmp(radix, 36) < 1)) ? ((_elm_lang$core$Native_Utils.cmp(i, 0) < 0) ? _elm_lang$core$Result$Ok(
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				'-',
-				A2(_fredcy$elm_parseint$ParseInt$toRadix$, radix, 0 - i))) : _elm_lang$core$Result$Ok(
-			A2(_fredcy$elm_parseint$ParseInt$toRadix$, radix, i))) : _elm_lang$core$Result$Err(
-			_fredcy$elm_parseint$ParseInt$InvalidRadix(radix));
-	});
-var _fredcy$elm_parseint$ParseInt$OutOfRange = function (a) {
-	return {ctor: 'OutOfRange', _0: a};
-};
-var _fredcy$elm_parseint$ParseInt$InvalidChar = function (a) {
-	return {ctor: 'InvalidChar', _0: a};
-};
-var _fredcy$elm_parseint$ParseInt$intFromChar = F2(
-	function (radix, c) {
-		var validInt = function (i) {
-			return (_elm_lang$core$Native_Utils.cmp(i, radix) < 0) ? _elm_lang$core$Result$Ok(i) : _elm_lang$core$Result$Err(
-				_fredcy$elm_parseint$ParseInt$OutOfRange(c));
-		};
-		var toInt = A3(
-			_fredcy$elm_parseint$ParseInt$isBetween,
-			_elm_lang$core$Native_Utils.chr('0'),
-			_elm_lang$core$Native_Utils.chr('9'),
-			c) ? _elm_lang$core$Result$Ok(
-			A2(
-				_fredcy$elm_parseint$ParseInt$charOffset,
-				_elm_lang$core$Native_Utils.chr('0'),
-				c)) : (A3(
-			_fredcy$elm_parseint$ParseInt$isBetween,
-			_elm_lang$core$Native_Utils.chr('a'),
-			_elm_lang$core$Native_Utils.chr('z'),
-			c) ? _elm_lang$core$Result$Ok(
-			10 + A2(
-				_fredcy$elm_parseint$ParseInt$charOffset,
-				_elm_lang$core$Native_Utils.chr('a'),
-				c)) : (A3(
-			_fredcy$elm_parseint$ParseInt$isBetween,
-			_elm_lang$core$Native_Utils.chr('A'),
-			_elm_lang$core$Native_Utils.chr('Z'),
-			c) ? _elm_lang$core$Result$Ok(
-			10 + A2(
-				_fredcy$elm_parseint$ParseInt$charOffset,
-				_elm_lang$core$Native_Utils.chr('A'),
-				c)) : _elm_lang$core$Result$Err(
-			_fredcy$elm_parseint$ParseInt$InvalidChar(c))));
-		return A2(_elm_lang$core$Result$andThen, toInt, validInt);
-	});
-var _fredcy$elm_parseint$ParseInt$parseIntR = F2(
-	function (radix, rstring) {
-		var _p0 = _elm_lang$core$String$uncons(rstring);
-		if (_p0.ctor === 'Nothing') {
-			return _elm_lang$core$Result$Ok(0);
-		} else {
-			return A2(
-				_elm_lang$core$Result$andThen,
-				A2(_fredcy$elm_parseint$ParseInt$intFromChar, radix, _p0._0._0),
-				function (ci) {
-					return A2(
-						_elm_lang$core$Result$andThen,
-						A2(_fredcy$elm_parseint$ParseInt$parseIntR, radix, _p0._0._1),
-						function (ri) {
-							return _elm_lang$core$Result$Ok(ci + (ri * radix));
-						});
-				});
-		}
-	});
-var _fredcy$elm_parseint$ParseInt$parseIntRadix = F2(
-	function (radix, string) {
-		return ((_elm_lang$core$Native_Utils.cmp(2, radix) < 1) && (_elm_lang$core$Native_Utils.cmp(radix, 36) < 1)) ? A2(
-			_fredcy$elm_parseint$ParseInt$parseIntR,
-			radix,
-			_elm_lang$core$String$reverse(string)) : _elm_lang$core$Result$Err(
-			_fredcy$elm_parseint$ParseInt$InvalidRadix(radix));
-	});
-var _fredcy$elm_parseint$ParseInt$parseInt = _fredcy$elm_parseint$ParseInt$parseIntRadix(10);
-var _fredcy$elm_parseint$ParseInt$parseIntOct = _fredcy$elm_parseint$ParseInt$parseIntRadix(8);
-var _fredcy$elm_parseint$ParseInt$parseIntHex = _fredcy$elm_parseint$ParseInt$parseIntRadix(16);
-//import Maybe, Native.List //
-
-var _elm_lang$core$Native_Regex = function() {
-
-function escape(str)
-{
-	return str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-}
-function caseInsensitive(re)
-{
-	return new RegExp(re.source, 'gi');
-}
-function regex(raw)
-{
-	return new RegExp(raw, 'g');
-}
-
-function contains(re, string)
-{
-	return string.match(re) !== null;
-}
-
-function find(n, re, str)
-{
-	n = n.ctor === 'All' ? Infinity : n._0;
-	var out = [];
-	var number = 0;
-	var string = str;
-	var lastIndex = re.lastIndex;
-	var prevLastIndex = -1;
-	var result;
-	while (number++ < n && (result = re.exec(string)))
-	{
-		if (prevLastIndex === re.lastIndex) break;
-		var i = result.length - 1;
-		var subs = new Array(i);
-		while (i > 0)
-		{
-			var submatch = result[i];
-			subs[--i] = submatch === undefined
-				? _elm_lang$core$Maybe$Nothing
-				: _elm_lang$core$Maybe$Just(submatch);
-		}
-		out.push({
-			match: result[0],
-			submatches: _elm_lang$core$Native_List.fromArray(subs),
-			index: result.index,
-			number: number
-		});
-		prevLastIndex = re.lastIndex;
-	}
-	re.lastIndex = lastIndex;
-	return _elm_lang$core$Native_List.fromArray(out);
-}
-
-function replace(n, re, replacer, string)
-{
-	n = n.ctor === 'All' ? Infinity : n._0;
-	var count = 0;
-	function jsReplacer(match)
-	{
-		if (count++ >= n)
-		{
-			return match;
-		}
-		var i = arguments.length - 3;
-		var submatches = new Array(i);
-		while (i > 0)
-		{
-			var submatch = arguments[i];
-			submatches[--i] = submatch === undefined
-				? _elm_lang$core$Maybe$Nothing
-				: _elm_lang$core$Maybe$Just(submatch);
-		}
-		return replacer({
-			match: match,
-			submatches: _elm_lang$core$Native_List.fromArray(submatches),
-			index: arguments[i - 1],
-			number: count
-		});
-	}
-	return string.replace(re, jsReplacer);
-}
-
-function split(n, re, str)
-{
-	n = n.ctor === 'All' ? Infinity : n._0;
-	if (n === Infinity)
-	{
-		return _elm_lang$core$Native_List.fromArray(str.split(re));
-	}
-	var string = str;
-	var result;
-	var out = [];
-	var start = re.lastIndex;
-	while (n--)
-	{
-		if (!(result = re.exec(string))) break;
-		out.push(string.slice(start, result.index));
-		start = re.lastIndex;
-	}
-	out.push(string.slice(start));
-	return _elm_lang$core$Native_List.fromArray(out);
-}
-
-return {
-	regex: regex,
-	caseInsensitive: caseInsensitive,
-	escape: escape,
-
-	contains: F2(contains),
-	find: F3(find),
-	replace: F4(replace),
-	split: F3(split)
-};
-
-}();
-var _elm_lang$core$Regex$split = _elm_lang$core$Native_Regex.split;
-var _elm_lang$core$Regex$replace = _elm_lang$core$Native_Regex.replace;
-var _elm_lang$core$Regex$find = _elm_lang$core$Native_Regex.find;
-var _elm_lang$core$Regex$contains = _elm_lang$core$Native_Regex.contains;
-var _elm_lang$core$Regex$caseInsensitive = _elm_lang$core$Native_Regex.caseInsensitive;
-var _elm_lang$core$Regex$regex = _elm_lang$core$Native_Regex.regex;
-var _elm_lang$core$Regex$escape = _elm_lang$core$Native_Regex.escape;
-var _elm_lang$core$Regex$Match = F4(
-	function (a, b, c, d) {
-		return {match: a, submatches: b, index: c, number: d};
-	});
-var _elm_lang$core$Regex$Regex = {ctor: 'Regex'};
-var _elm_lang$core$Regex$AtMost = function (a) {
-	return {ctor: 'AtMost', _0: a};
-};
-var _elm_lang$core$Regex$All = {ctor: 'All'};
-var _eskimoblood$elm_color_extra$Color_Convert$xyzToColor = function (_p0) {
-	var _p1 = _p0;
-	var c = function (ch) {
-		var ch$ = (_elm_lang$core$Native_Utils.cmp(ch, 3.1308e-3) > 0) ? ((1.055 * Math.pow(ch, 1 / 2.4)) - 5.5e-2) : (12.92 * ch);
-		return _elm_lang$core$Basics$round(
-			A3(_elm_lang$core$Basics$clamp, 0, 255, ch$ * 255));
-	};
-	var z$ = _p1.z / 100;
-	var y$ = _p1.y / 100;
-	var x$ = _p1.x / 100;
-	var r = ((x$ * 3.2404542) + (y$ * -1.5371385)) + (z$ * -0.4986);
-	var g = ((x$ * -0.969266) + (y$ * 1.8760108)) + (z$ * 4.1556e-2);
-	var b = ((x$ * 5.56434e-2) + (y$ * -0.2040259)) + (z$ * 1.0572252);
-	return A3(
-		_elm_lang$core$Color$rgb,
-		c(r),
-		c(g),
-		c(b));
-};
-var _eskimoblood$elm_color_extra$Color_Convert$labToXyz = function (_p2) {
-	var _p3 = _p2;
-	var y = (_p3.l + 16) / 116;
-	var c = function (ch) {
-		var ch$ = (ch * ch) * ch;
-		return (_elm_lang$core$Native_Utils.cmp(ch$, 8.856e-3) > 0) ? ch$ : ((ch - (16 / 116)) / 7.787);
-	};
-	return {
-		y: c(y) * 100,
-		x: c(y + (_p3.a / 500)) * 95.047,
-		z: c(y - (_p3.b / 200)) * 108.883
-	};
-};
-var _eskimoblood$elm_color_extra$Color_Convert$labToColor = function (lab) {
-	return _eskimoblood$elm_color_extra$Color_Convert$xyzToColor(
-		_eskimoblood$elm_color_extra$Color_Convert$labToXyz(lab));
-};
-var _eskimoblood$elm_color_extra$Color_Convert$xyzToLab = function (_p4) {
-	var _p5 = _p4;
-	var c = function (ch) {
-		return (_elm_lang$core$Native_Utils.cmp(ch, 8.856e-3) > 0) ? Math.pow(ch, 1 / 3) : ((7.787 * ch) + (16 / 116));
-	};
-	var x$ = c(_p5.x / 95.047);
-	var y$ = c(_p5.y / 100);
-	var z$ = c(_p5.z / 108.883);
-	return {l: (116 * y$) - 16, a: 500 * (x$ - y$), b: 200 * (y$ - z$)};
-};
-var _eskimoblood$elm_color_extra$Color_Convert$colorToXyz = function (cl) {
-	var _p6 = _elm_lang$core$Color$toRgb(cl);
-	var red = _p6.red;
-	var green = _p6.green;
-	var blue = _p6.blue;
-	var c = function (ch) {
-		var ch$ = _elm_lang$core$Basics$toFloat(ch) / 255;
-		var ch$$ = (_elm_lang$core$Native_Utils.cmp(ch$, 4.045e-2) > 0) ? Math.pow((ch$ + 5.5e-2) / 1.055, 2.4) : (ch$ / 12.92);
-		return ch$$ * 100;
-	};
-	var r = c(red);
-	var g = c(green);
-	var b = c(blue);
-	return {x: ((r * 0.4124) + (g * 0.3576)) + (b * 0.1805), y: ((r * 0.2126) + (g * 0.7152)) + (b * 7.22e-2), z: ((r * 1.93e-2) + (g * 0.1192)) + (b * 0.9505)};
-};
-var _eskimoblood$elm_color_extra$Color_Convert$colorToLab = function (cl) {
-	return _eskimoblood$elm_color_extra$Color_Convert$xyzToLab(
-		_eskimoblood$elm_color_extra$Color_Convert$colorToXyz(cl));
-};
-var _eskimoblood$elm_color_extra$Color_Convert$toRadix = function (n) {
-	var getChr = function (c) {
-		return (_elm_lang$core$Native_Utils.cmp(c, 10) < 0) ? _elm_lang$core$Basics$toString(c) : _elm_lang$core$String$fromChar(
-			_elm_lang$core$Char$fromCode(87 + c));
-	};
-	return (_elm_lang$core$Native_Utils.cmp(n, 16) < 0) ? getChr(n) : A2(
-		_elm_lang$core$Basics_ops['++'],
-		_eskimoblood$elm_color_extra$Color_Convert$toRadix((n / 16) | 0),
-		getChr(
-			A2(_elm_lang$core$Basics_ops['%'], n, 16)));
-};
-var _eskimoblood$elm_color_extra$Color_Convert$toHex = function (n) {
-	var hex = _eskimoblood$elm_color_extra$Color_Convert$toRadix(n);
-	return _elm_lang$core$Native_Utils.eq(
-		_elm_lang$core$String$length(hex),
-		1) ? A2(_elm_lang$core$Basics_ops['++'], '0', hex) : hex;
-};
-var _eskimoblood$elm_color_extra$Color_Convert$colorToHex = function (cl) {
-	var _p7 = _elm_lang$core$Color$toRgb(cl);
-	var red = _p7.red;
-	var green = _p7.green;
-	var blue = _p7.blue;
-	var alpha = _p7.alpha;
-	return A2(
-		_elm_lang$core$Basics_ops['++'],
-		'#',
-		A2(
-			_elm_lang$core$Basics_ops['++'],
-			_eskimoblood$elm_color_extra$Color_Convert$toHex(red),
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				_eskimoblood$elm_color_extra$Color_Convert$toHex(green),
-				_eskimoblood$elm_color_extra$Color_Convert$toHex(blue))));
-};
-var _eskimoblood$elm_color_extra$Color_Convert$hexToColor = function (c) {
-	var r = _elm_lang$core$List$head(
-		A2(
 			_elm_lang$core$List$map,
-			function (_) {
-				return _.submatches;
-			},
-			A3(
-				_elm_lang$core$Regex$find,
-				_elm_lang$core$Regex$All,
-				_elm_lang$core$Regex$regex('^#?([a-f\\d]{2})([a-f\\d]{2})([a-f\\d]{2})$'),
-				_elm_lang$core$String$toLower(c))));
-	var _p8 = r;
-	if (_p8.ctor === 'Just') {
-		var v = _elm_lang$core$Array$fromList(
-			A2(
-				_elm_lang$core$List$filterMap,
-				_elm_lang$core$Basics$identity,
-				A2(
-					_elm_lang$core$List$map,
-					_elm_lang$core$Result$toMaybe,
-					A2(
-						_elm_lang$core$List$map,
-						_fredcy$elm_parseint$ParseInt$parseIntHex,
-						A2(_elm_lang$core$List$filterMap, _elm_lang$core$Basics$identity, _p8._0)))));
-		var r = A2(_elm_lang$core$Array$get, 0, v);
-		var g = A2(_elm_lang$core$Array$get, 1, v);
-		var b = A2(_elm_lang$core$Array$get, 2, v);
-		var _p9 = r;
-		if (_p9.ctor === 'Just') {
-			var _p10 = g;
-			if (_p10.ctor === 'Just') {
-				var _p11 = b;
-				if (_p11.ctor === 'Just') {
-					return _elm_lang$core$Maybe$Just(
-						A3(_elm_lang$core$Color$rgb, _p9._0, _p10._0, _p11._0));
-				} else {
-					return _elm_lang$core$Maybe$Nothing;
-				}
-			} else {
-				return _elm_lang$core$Maybe$Nothing;
-			}
-		} else {
-			return _elm_lang$core$Maybe$Nothing;
-		}
-	} else {
-		return _elm_lang$core$Maybe$Nothing;
-	}
-};
-var _eskimoblood$elm_color_extra$Color_Convert$cssColorString = F2(
-	function (kind, values) {
-		return A2(
-			_elm_lang$core$Basics_ops['++'],
-			kind,
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				'(',
-				A2(
-					_elm_lang$core$Basics_ops['++'],
-					A2(_elm_lang$core$String$join, ', ', values),
-					')')));
+			_elm_lang$core$Basics$snd,
+			A2(_ManuScriptHub$elm_diagram$DependencyGraph$outgoingEdges, v, model));
 	});
-var _eskimoblood$elm_color_extra$Color_Convert$toPercentString = function (h) {
+var _ManuScriptHub$elm_diagram$DependencyGraph$nodesWithoutIncoming = function (model) {
 	return A2(
-		_elm_lang$core$Basics_ops['++'],
-		_elm_lang$core$Basics$toString(
-			_elm_lang$core$Basics$round(h * 100)),
-		'%');
+		_elm_lang$core$List$filter,
+		function (v) {
+			return _elm_lang$core$Basics$not(
+				A2(
+					_elm_lang$core$List$any,
+					function (_p4) {
+						var _p5 = _p4;
+						return _elm_lang$core$Native_Utils.eq(_p5._1, v);
+					},
+					model.edges));
+		},
+		model.vertices);
 };
-var _eskimoblood$elm_color_extra$Color_Convert$hueToString = function (h) {
-	return _elm_lang$core$Basics$toString(
-		_elm_lang$core$Basics$round((h * 180) / _elm_lang$core$Basics$pi));
-};
-var _eskimoblood$elm_color_extra$Color_Convert$colorToCssHsla = function (cl) {
-	var _p12 = _elm_lang$core$Color$toHsl(cl);
-	var hue = _p12.hue;
-	var saturation = _p12.saturation;
-	var lightness = _p12.lightness;
-	var alpha = _p12.alpha;
+var _ManuScriptHub$elm_diagram$DependencyGraph$reachableFrom = F3(
+	function (u, v, graph) {
+		return _elm_lang$core$Native_Utils.eq(u, v) ? true : false;
+	});
+var _ManuScriptHub$elm_diagram$DependencyGraph$view = function (model) {
 	return A2(
-		_eskimoblood$elm_color_extra$Color_Convert$cssColorString,
-		'hsla',
+		_elm_lang$html$Html$div,
+		_elm_lang$core$Native_List.fromArray(
+			[]),
 		_elm_lang$core$Native_List.fromArray(
 			[
-				_eskimoblood$elm_color_extra$Color_Convert$hueToString(hue),
-				_eskimoblood$elm_color_extra$Color_Convert$toPercentString(saturation),
-				_eskimoblood$elm_color_extra$Color_Convert$toPercentString(lightness),
-				_elm_lang$core$Basics$toString(alpha)
+				_elm_lang$html$Html$text(
+				_elm_lang$core$Basics$toString(model))
 			]));
 };
-var _eskimoblood$elm_color_extra$Color_Convert$colorToCssHsl = function (cl) {
-	var _p13 = _elm_lang$core$Color$toHsl(cl);
-	var hue = _p13.hue;
-	var saturation = _p13.saturation;
-	var lightness = _p13.lightness;
-	var alpha = _p13.alpha;
-	return A2(
-		_eskimoblood$elm_color_extra$Color_Convert$cssColorString,
-		'hsl',
-		_elm_lang$core$Native_List.fromArray(
-			[
-				_eskimoblood$elm_color_extra$Color_Convert$hueToString(hue),
-				_eskimoblood$elm_color_extra$Color_Convert$toPercentString(saturation),
-				_eskimoblood$elm_color_extra$Color_Convert$toPercentString(lightness)
-			]));
-};
-var _eskimoblood$elm_color_extra$Color_Convert$colorToCssRgba = function (cl) {
-	var _p14 = _elm_lang$core$Color$toRgb(cl);
-	var red = _p14.red;
-	var green = _p14.green;
-	var blue = _p14.blue;
-	var alpha = _p14.alpha;
-	return A2(
-		_eskimoblood$elm_color_extra$Color_Convert$cssColorString,
-		'rgba',
-		_elm_lang$core$Native_List.fromArray(
-			[
-				_elm_lang$core$Basics$toString(red),
-				_elm_lang$core$Basics$toString(green),
-				_elm_lang$core$Basics$toString(blue),
-				_elm_lang$core$Basics$toString(alpha)
-			]));
-};
-var _eskimoblood$elm_color_extra$Color_Convert$colorToCssRgb = function (cl) {
-	var _p15 = _elm_lang$core$Color$toRgb(cl);
-	var red = _p15.red;
-	var green = _p15.green;
-	var blue = _p15.blue;
-	var alpha = _p15.alpha;
-	return A2(
-		_eskimoblood$elm_color_extra$Color_Convert$cssColorString,
-		'rgb',
-		_elm_lang$core$Native_List.fromArray(
-			[
-				_elm_lang$core$Basics$toString(red),
-				_elm_lang$core$Basics$toString(green),
-				_elm_lang$core$Basics$toString(blue)
-			]));
-};
-var _eskimoblood$elm_color_extra$Color_Convert$XYZ = F3(
-	function (a, b, c) {
-		return {x: a, y: b, z: c};
+var _ManuScriptHub$elm_diagram$DependencyGraph$Model = F2(
+	function (a, b) {
+		return {vertices: a, edges: b};
 	});
-var _eskimoblood$elm_color_extra$Color_Convert$Lab = F3(
-	function (a, b, c) {
-		return {l: a, a: b, b: c};
-	});
-var _ManuScriptHub$elm_diagram$Symbol$subscriptions = function (model) {
-	return _elm_lang$core$Platform_Sub$none;
-};
-var _ManuScriptHub$elm_diagram$Symbol$move = F2(
-	function (model, t) {
-		return _elm_lang$core$Native_Utils.update(
-			model,
-			{
-				pos: A2(
-					_elm_community$elm_linear_algebra$Math_Vector2$add,
-					model.pos,
-					A2(
-						_elm_community$elm_linear_algebra$Math_Vector2$scale,
-						t,
-						A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 1, 1)))
-			});
-	});
-var _ManuScriptHub$elm_diagram$Symbol$rect = function (model) {
-	return _elm_lang$core$Native_List.fromArray(
-		[
-			{ctor: '_Tuple2', _0: _elm_lang$svg$Svg_Attributes$x, _1: '0'},
-			{ctor: '_Tuple2', _0: _elm_lang$svg$Svg_Attributes$y, _1: '0'},
-			{
-			ctor: '_Tuple2',
-			_0: _elm_lang$svg$Svg_Attributes$width,
-			_1: _elm_lang$core$Basics$toString(
-				_elm_community$elm_linear_algebra$Math_Vector2$getX(model.size))
-		},
-			{
-			ctor: '_Tuple2',
-			_0: _elm_lang$svg$Svg_Attributes$height,
-			_1: _elm_lang$core$Basics$toString(
-				_elm_community$elm_linear_algebra$Math_Vector2$getY(model.size))
-		},
-			{
-			ctor: '_Tuple2',
-			_0: _elm_lang$svg$Svg_Attributes$fill,
-			_1: _eskimoblood$elm_color_extra$Color_Convert$colorToHex(model.color)
-		},
-			{ctor: '_Tuple2', _0: _elm_lang$svg$Svg_Attributes$stroke, _1: 'black'}
-		]);
-};
-var _ManuScriptHub$elm_diagram$Symbol$circle = function (model) {
-	return _elm_lang$core$Native_List.fromArray(
-		[
-			{ctor: '_Tuple2', _0: _elm_lang$svg$Svg_Attributes$cx, _1: '0'},
-			{ctor: '_Tuple2', _0: _elm_lang$svg$Svg_Attributes$cy, _1: '0'},
-			{
-			ctor: '_Tuple2',
-			_0: _elm_lang$svg$Svg_Attributes$r,
-			_1: _elm_lang$core$Basics$toString(
-				_elm_community$elm_linear_algebra$Math_Vector2$getX(model.size))
-		},
-			{
-			ctor: '_Tuple2',
-			_0: _elm_lang$svg$Svg_Attributes$fill,
-			_1: _eskimoblood$elm_color_extra$Color_Convert$colorToHex(model.color)
-		},
-			{ctor: '_Tuple2', _0: _elm_lang$svg$Svg_Attributes$stroke, _1: 'black'}
-		]);
-};
-var _ManuScriptHub$elm_diagram$Symbol$attrs = function (list) {
+var _ManuScriptHub$elm_diagram$DependencyGraph$init = A2(
+	_ManuScriptHub$elm_diagram$DependencyGraph$Model,
+	_elm_lang$core$Native_List.fromArray(
+		[]),
+	_elm_lang$core$Native_List.fromArray(
+		[]));
+var _ManuScriptHub$elm_diagram$DependencyGraph$fromList = function (list) {
 	return A2(
-		_elm_lang$core$List$map,
-		function (_p0) {
-			var _p1 = _p0;
-			return _p1._0(_p1._1);
-		},
-		list);
-};
-var _ManuScriptHub$elm_diagram$Symbol$translate = function (pos) {
-	return A2(
-		_elm_lang$core$Basics_ops['++'],
-		'translate (',
-		A2(
-			_elm_lang$core$Basics_ops['++'],
-			_elm_lang$core$Basics$toString(
-				_elm_community$elm_linear_algebra$Math_Vector2$getX(pos)),
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				',',
-				A2(
-					_elm_lang$core$Basics_ops['++'],
-					_elm_lang$core$Basics$toString(
-						_elm_community$elm_linear_algebra$Math_Vector2$getY(pos)),
-					')'))));
-};
-var _ManuScriptHub$elm_diagram$Symbol$toSvg = function (model) {
-	var _p2 = model.shape;
-	if (_p2.ctor === 'Circle') {
-		return A2(
-			_elm_lang$svg$Svg$circle,
-			_ManuScriptHub$elm_diagram$Symbol$attrs(
-				_ManuScriptHub$elm_diagram$Symbol$circle(model)),
-			_elm_lang$core$Native_List.fromArray(
-				[]));
-	} else {
-		return A2(
-			_elm_lang$svg$Svg$rect,
-			_ManuScriptHub$elm_diagram$Symbol$attrs(
-				_ManuScriptHub$elm_diagram$Symbol$rect(model)),
-			_elm_lang$core$Native_List.fromArray(
-				[]));
-	}
-};
-var _ManuScriptHub$elm_diagram$Symbol$view = function (model) {
-	var content = _ManuScriptHub$elm_diagram$Symbol$toSvg(model);
-	return A2(
-		_elm_lang$svg$Svg$g,
-		_elm_lang$core$Native_List.fromArray(
-			[
-				_elm_lang$svg$Svg_Attributes$transform(
-				_ManuScriptHub$elm_diagram$Symbol$translate(model.pos))
-			]),
-		_elm_lang$core$Native_List.fromArray(
-			[content]));
-};
-var _ManuScriptHub$elm_diagram$Symbol$update = F2(
-	function (msg, model) {
-		var _p3 = msg;
-		switch (_p3.ctor) {
-			case 'Move':
-				return _ManuScriptHub$elm_diagram$Extra_Cmd$noFx(
-					_elm_lang$core$Native_Utils.update(
-						model,
-						{pos: _p3._0}));
-			case 'SetColor':
-				return _ManuScriptHub$elm_diagram$Extra_Cmd$noFx(
-					_elm_lang$core$Native_Utils.update(
-						model,
-						{color: _p3._0}));
-			default:
-				return _ManuScriptHub$elm_diagram$Extra_Cmd$noFx(
-					_elm_lang$core$Native_Utils.update(
-						model,
-						{size: _p3._0}));
-		}
-	});
-var _ManuScriptHub$elm_diagram$Symbol$Model = F5(
-	function (a, b, c, d, e) {
-		return {id: a, shape: b, color: c, size: d, pos: e};
-	});
-var _ManuScriptHub$elm_diagram$Symbol$init = F5(
-	function (id, shape, color, size, pos) {
-		return _ManuScriptHub$elm_diagram$Extra_Cmd$noFx(
-			A5(_ManuScriptHub$elm_diagram$Symbol$Model, id, shape, color, size, pos));
-	});
-var _ManuScriptHub$elm_diagram$Symbol$Rect = {ctor: 'Rect'};
-var _ManuScriptHub$elm_diagram$Symbol$Circle = {ctor: 'Circle'};
-var _ManuScriptHub$elm_diagram$Symbol$Resize = function (a) {
-	return {ctor: 'Resize', _0: a};
-};
-var _ManuScriptHub$elm_diagram$Symbol$SetColor = function (a) {
-	return {ctor: 'SetColor', _0: a};
-};
-var _ManuScriptHub$elm_diagram$Symbol$Move = function (a) {
-	return {ctor: 'Move', _0: a};
-};
-var _ManuScriptHub$elm_diagram$Extra_MathVector2$multiplyVec = F2(
-	function (v1, v2) {
-		return A2(
-			_elm_community$elm_linear_algebra$Math_Vector2$vec2,
-			_elm_community$elm_linear_algebra$Math_Vector2$getX(v1) * _elm_community$elm_linear_algebra$Math_Vector2$getX(v2),
-			_elm_community$elm_linear_algebra$Math_Vector2$getY(v1) * _elm_community$elm_linear_algebra$Math_Vector2$getY(v2));
-	});
-var _ManuScriptHub$elm_diagram$Extra_MathVector2$toIntRecord = function (v) {
-	return {
-		x: _elm_lang$core$Basics$round(
-			_elm_community$elm_linear_algebra$Math_Vector2$getX(v)),
-		y: _elm_lang$core$Basics$round(
-			_elm_community$elm_linear_algebra$Math_Vector2$getY(v))
-	};
-};
-var _ManuScriptHub$elm_diagram$Extra_MathVector2$fromIntRecord = function (_p0) {
-	var _p1 = _p0;
-	return _elm_community$elm_linear_algebra$Math_Vector2$fromTuple(
-		{
-			ctor: '_Tuple2',
-			_0: _elm_lang$core$Basics$toFloat(_p1.x),
-			_1: _elm_lang$core$Basics$toFloat(_p1.y)
-		});
-};
-var _ManuScriptHub$elm_diagram$Extra_MathVector2$fromIntTuple = function (_p2) {
-	var _p3 = _p2;
-	return _ManuScriptHub$elm_diagram$Extra_MathVector2$fromIntRecord(
-		{x: _p3._0, y: _p3._1});
-};
-var _ManuScriptHub$elm_diagram$Extra_MathVector2$rotate = F2(
-	function (v, g) {
-		var r = g * 1.7453293e-2;
-		var s = _elm_lang$core$Basics$sin(r);
-		var c = _elm_lang$core$Basics$cos(r);
-		var iy = _elm_community$elm_linear_algebra$Math_Vector2$getY(v);
-		var sy = s * iy;
-		var cy = c * iy;
-		var ix = _elm_community$elm_linear_algebra$Math_Vector2$getX(v);
-		var sx = s * ix;
-		var ty = sx + cy;
-		var cx = c * ix;
-		var tx = cx - sy;
-		return A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, tx, ty);
-	});
-var _ManuScriptHub$elm_diagram$Extra_Svg$vecToSvgPos = function (vec) {
-	return A2(
-		_elm_lang$core$Basics_ops['++'],
-		_elm_lang$core$Basics$toString(
-			_elm_community$elm_linear_algebra$Math_Vector2$getX(vec)),
-		A2(
-			_elm_lang$core$Basics_ops['++'],
-			' ',
-			_elm_lang$core$Basics$toString(
-				_elm_community$elm_linear_algebra$Math_Vector2$getY(vec))));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$sy = function (_p0) {
-	return _elm_lang$core$Basics$toString(
-		_elm_community$elm_linear_algebra$Math_Vector2$getY(_p0));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$sx = function (_p1) {
-	return _elm_lang$core$Basics$toString(
-		_elm_community$elm_linear_algebra$Math_Vector2$getX(_p1));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$sp = function (vec) {
-	return A2(
-		_elm_lang$core$Basics_ops['++'],
-		_ManuScriptHub$elm_diagram$Extra_Svg$sx(vec),
-		A2(
-			_elm_lang$core$Basics_ops['++'],
-			' ',
-			_ManuScriptHub$elm_diagram$Extra_Svg$sy(vec)));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$sxy = function (vec) {
-	return A2(
-		_elm_lang$core$Basics_ops['++'],
-		_ManuScriptHub$elm_diagram$Extra_Svg$sx(vec),
-		A2(
-			_elm_lang$core$Basics_ops['++'],
-			',',
-			_ManuScriptHub$elm_diagram$Extra_Svg$sy(vec)));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$s = function (s) {
-	return _elm_lang$core$Basics$toString(s);
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$translate = function (pos) {
-	return A2(
-		_elm_lang$core$Basics_ops['++'],
-		'translate (',
-		A2(
-			_elm_lang$core$Basics_ops['++'],
-			_elm_lang$core$Basics$toString(
-				_elm_community$elm_linear_algebra$Math_Vector2$getX(pos)),
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				',',
-				A2(
-					_elm_lang$core$Basics_ops['++'],
-					_elm_lang$core$Basics$toString(
-						_elm_community$elm_linear_algebra$Math_Vector2$getY(pos)),
-					')'))));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$path = F6(
-	function (st, p1, _p4, _p3, p2, _p2) {
-		var _p5 = _p4;
-		var _p6 = _p3;
-		var path = A2(
-			_elm_lang$core$Basics_ops['++'],
-			'M ',
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				_ManuScriptHub$elm_diagram$Extra_Svg$sp(p1),
-				A2(
-					_elm_lang$core$Basics_ops['++'],
-					' C ',
-					A2(
-						_elm_lang$core$String$join,
-						' ',
-						A2(
-							_elm_lang$core$List$map,
-							_ManuScriptHub$elm_diagram$Extra_Svg$sp,
-							_elm_lang$core$Native_List.fromArray(
-								[_p5._0, _p6._0, p2]))))));
-		return A2(
-			_elm_lang$svg$Svg$path,
-			_elm_lang$core$Native_List.fromArray(
-				[
-					_elm_lang$svg$Svg_Attributes$style(st),
-					_elm_lang$svg$Svg_Attributes$d(path)
-				]),
-			_elm_lang$core$Native_List.fromArray(
-				[]));
-	});
-var _ManuScriptHub$elm_diagram$Extra_Svg$getYs = function (v) {
-	return _elm_lang$core$Basics$toString(
-		_elm_community$elm_linear_algebra$Math_Vector2$getY(v));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$getXs = function (v) {
-	return _elm_lang$core$Basics$toString(
-		_elm_community$elm_linear_algebra$Math_Vector2$getX(v));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$vecToStr = function (v) {
-	return A2(
-		_elm_lang$core$Basics_ops['++'],
-		_ManuScriptHub$elm_diagram$Extra_Svg$getXs(v),
-		A2(
-			_elm_lang$core$Basics_ops['++'],
-			' ',
-			_ManuScriptHub$elm_diagram$Extra_Svg$getYs(v)));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$sampleToSvgPoints = function (sample) {
-	var head = _ManuScriptHub$elm_diagram$Extra_Svg$vecToStr(
-		A2(
-			_elm_lang$core$Maybe$withDefault,
-			A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, 0),
-			_elm_lang$core$List$head(sample)));
-	var tails = _elm_lang$core$String$concat(
-		A2(
-			_elm_lang$core$List$intersperse,
-			', ',
-			A2(
-				_elm_lang$core$List$map,
-				_ManuScriptHub$elm_diagram$Extra_Svg$vecToStr,
-				A2(
-					_elm_lang$core$Maybe$withDefault,
-					_elm_lang$core$Native_List.fromArray(
-						[]),
-					_elm_lang$core$List$tail(sample)))));
-	return A2(
-		_elm_lang$core$Basics_ops['++'],
-		'M ',
-		A2(
-			_elm_lang$core$Basics_ops['++'],
-			head,
-			A2(_elm_lang$core$Basics_ops['++'], ' C ', tails)));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$vecToCircle = function (v) {
-	return A2(
-		_elm_lang$svg$Svg$circle,
-		_elm_lang$core$Native_List.fromArray(
-			[
-				_elm_lang$svg$Svg_Attributes$cx(
-				_ManuScriptHub$elm_diagram$Extra_Svg$getXs(v)),
-				_elm_lang$svg$Svg_Attributes$cy(
-				_ManuScriptHub$elm_diagram$Extra_Svg$getYs(v)),
-				_elm_lang$svg$Svg_Attributes$r('1'),
-				_elm_lang$svg$Svg_Attributes$fill('transparent'),
-				_elm_lang$svg$Svg_Attributes$stroke('red')
-			]),
+		_ManuScriptHub$elm_diagram$DependencyGraph$Model,
+		list,
 		_elm_lang$core$Native_List.fromArray(
 			[]));
 };
-var _ManuScriptHub$elm_diagram$Extra_Svg$sampleToSvg = function (sample) {
-	return A2(
-		_elm_lang$core$Basics_ops['++'],
-		A2(_elm_lang$core$List$map, _ManuScriptHub$elm_diagram$Extra_Svg$vecToCircle, sample),
+var _ManuScriptHub$elm_diagram$DependencyGraph$RemoveEdges = function (a) {
+	return {ctor: 'RemoveEdges', _0: a};
+};
+var _ManuScriptHub$elm_diagram$DependencyGraph$RemoveEdge = function (a) {
+	return {ctor: 'RemoveEdge', _0: a};
+};
+var _ManuScriptHub$elm_diagram$DependencyGraph$RemoveVertex = function (a) {
+	return {ctor: 'RemoveVertex', _0: a};
+};
+var _ManuScriptHub$elm_diagram$DependencyGraph$AddEdges = function (a) {
+	return {ctor: 'AddEdges', _0: a};
+};
+var _ManuScriptHub$elm_diagram$DependencyGraph$AddVertices = function (a) {
+	return {ctor: 'AddVertices', _0: a};
+};
+var _ManuScriptHub$elm_diagram$DependencyGraph$AddEdge = function (a) {
+	return {ctor: 'AddEdge', _0: a};
+};
+var _ManuScriptHub$elm_diagram$DependencyGraph$AddVertex = function (a) {
+	return {ctor: 'AddVertex', _0: a};
+};
+var _ManuScriptHub$elm_diagram$DependencyGraph$update = F2(
+	function (msg, model) {
+		var _p6 = msg;
+		switch (_p6.ctor) {
+			case 'AddEdges':
+				return A3(
+					_elm_lang$core$List$foldl,
+					_ManuScriptHub$elm_diagram$DependencyGraph$update,
+					model,
+					A2(_elm_lang$core$List$map, _ManuScriptHub$elm_diagram$DependencyGraph$AddEdge, _p6._0));
+			case 'AddVertices':
+				return A3(
+					_elm_lang$core$List$foldl,
+					_ManuScriptHub$elm_diagram$DependencyGraph$update,
+					model,
+					A2(_elm_lang$core$List$map, _ManuScriptHub$elm_diagram$DependencyGraph$AddVertex, _p6._0));
+			case 'AddVertex':
+				var _p7 = _p6._0;
+				var filtered = A2(
+					_elm_lang$core$List$filter,
+					F2(
+						function (x, y) {
+							return !_elm_lang$core$Native_Utils.eq(x, y);
+						})(_p7),
+					model.vertices);
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{
+						vertices: A2(
+							_elm_lang$core$Basics_ops['++'],
+							filtered,
+							_elm_lang$core$Native_List.fromArray(
+								[_p7]))
+					});
+			case 'AddEdge':
+				var _p8 = _p6._0;
+				var filtered = A2(
+					_elm_lang$core$List$filter,
+					F2(
+						function (x, y) {
+							return !_elm_lang$core$Native_Utils.eq(x, y);
+						})(_p8),
+					model.edges);
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{
+						edges: A2(
+							_elm_lang$core$Basics_ops['++'],
+							model.edges,
+							_elm_lang$core$Native_List.fromArray(
+								[_p8]))
+					});
+			case 'RemoveEdge':
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{
+						edges: A2(
+							_elm_lang$core$List$filter,
+							F2(
+								function (x, y) {
+									return !_elm_lang$core$Native_Utils.eq(x, y);
+								})(_p6._0),
+							model.edges)
+					});
+			case 'RemoveEdges':
+				return A3(
+					_elm_lang$core$List$foldl,
+					_ManuScriptHub$elm_diagram$DependencyGraph$update,
+					model,
+					A2(_elm_lang$core$List$map, _ManuScriptHub$elm_diagram$DependencyGraph$RemoveEdge, _p6._0));
+			default:
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{
+						vertices: A2(
+							_elm_lang$core$List$filter,
+							F2(
+								function (x, y) {
+									return !_elm_lang$core$Native_Utils.eq(x, y);
+								})(_p6._0),
+							model.vertices)
+					});
+		}
+	});
+var _ManuScriptHub$elm_diagram$DependencyGraph$sortStep = F2(
+	function (_p10, _p9) {
+		var _p11 = _p10;
+		var _p14 = _p11._1;
+		var _p12 = _p9;
+		var _p13 = _p12._1;
+		var model$ = A2(
+			_ManuScriptHub$elm_diagram$DependencyGraph$update,
+			_ManuScriptHub$elm_diagram$DependencyGraph$RemoveEdge(
+				{ctor: '_Tuple2', _0: _p11._0, _1: _p14}),
+			_p12._0);
+		var inc = A2(_ManuScriptHub$elm_diagram$DependencyGraph$incomingEdges, _p14, model$);
+		return _elm_lang$core$Native_Utils.eq(
+			_elm_lang$core$List$length(inc),
+			0) ? A2(
+			_elm_lang$core$Debug$log,
+			'mod',
+			{
+				ctor: '_Tuple2',
+				_0: model$,
+				_1: A2(
+					_elm_lang$core$Basics_ops['++'],
+					_p13,
+					_elm_lang$core$Native_List.fromArray(
+						[_p14]))
+			}) : A2(
+			_elm_lang$core$Debug$log,
+			'mod',
+			{ctor: '_Tuple2', _0: model$, _1: _p13});
+	});
+var _ManuScriptHub$elm_diagram$DependencyGraph$sortList = F2(
+	function (s, _p15) {
+		sortList:
+		while (true) {
+			var _p16 = _p15;
+			var _p21 = _p16._0;
+			var _p20 = _p16._1;
+			var _p17 = _elm_lang$core$List$head(s);
+			if (_p17.ctor === 'Nothing') {
+				return {ctor: '_Tuple2', _0: _p21, _1: _p20};
+			} else {
+				var _p19 = _p17._0;
+				var _p18 = A3(
+					_elm_lang$core$List$foldl,
+					_ManuScriptHub$elm_diagram$DependencyGraph$sortStep,
+					{
+						ctor: '_Tuple2',
+						_0: _p21,
+						_1: A2(
+							_elm_lang$core$List$filter,
+							F2(
+								function (x, y) {
+									return !_elm_lang$core$Native_Utils.eq(x, y);
+								})(_p19),
+							s)
+					},
+					A2(_ManuScriptHub$elm_diagram$DependencyGraph$outgoingEdges, _p19, _p21));
+				var model$ = _p18._0;
+				var s$$ = _p18._1;
+				var _v8 = s$$,
+					_v9 = {
+					ctor: '_Tuple2',
+					_0: model$,
+					_1: A2(
+						_elm_lang$core$Basics_ops['++'],
+						_p20,
+						_elm_lang$core$Native_List.fromArray(
+							[_p19]))
+				};
+				s = _v8;
+				_p15 = _v9;
+				continue sortList;
+			}
+		}
+	});
+var _ManuScriptHub$elm_diagram$DependencyGraph$topoSort = function (model) {
+	var _p22 = A2(
+		_ManuScriptHub$elm_diagram$DependencyGraph$sortList,
+		_ManuScriptHub$elm_diagram$DependencyGraph$nodesWithoutIncoming(model),
+		{
+			ctor: '_Tuple2',
+			_0: model,
+			_1: _elm_lang$core$Native_List.fromArray(
+				[])
+		});
+	var model$ = _p22._0;
+	var l = _p22._1;
+	return (_elm_lang$core$Native_Utils.cmp(
+		_elm_lang$core$List$length(model$.edges),
+		0) > 0) ? _elm_lang$core$Native_Utils.crash(
+		'DependencyGraph',
+		{
+			start: {line: 107, column: 13},
+			end: {line: 107, column: 24}
+		})('graph has at least one cycle') : _elm_lang$core$Native_Utils.update(
+		model$,
+		{vertices: l});
+};
+var _ManuScriptHub$elm_diagram$DependencyGraph$uut = A2(
+	_ManuScriptHub$elm_diagram$DependencyGraph$update,
+	_ManuScriptHub$elm_diagram$DependencyGraph$AddEdges(
 		_elm_lang$core$Native_List.fromArray(
 			[
 				A2(
-				_elm_lang$svg$Svg$path,
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$svg$Svg_Attributes$d(
-						_ManuScriptHub$elm_diagram$Extra_Svg$sampleToSvgPoints(sample)),
-						_elm_lang$svg$Svg_Attributes$stroke('black'),
-						_elm_lang$svg$Svg_Attributes$fill('transparent')
-					]),
-				_elm_lang$core$Native_List.fromArray(
-					[]))
-			]));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$vecYtoString = function (v) {
-	return _elm_lang$core$Basics$toString(
-		_elm_community$elm_linear_algebra$Math_Vector2$getY(v));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$vecXtoString = function (v) {
-	return _elm_lang$core$Basics$toString(
-		_elm_community$elm_linear_algebra$Math_Vector2$getX(v));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$vecToStringX_Y = function (v) {
-	return A2(
-		_elm_lang$core$Basics_ops['++'],
-		_ManuScriptHub$elm_diagram$Extra_Svg$vecXtoString(v),
-		A2(
-			_elm_lang$core$Basics_ops['++'],
-			' ',
-			_ManuScriptHub$elm_diagram$Extra_Svg$vecYtoString(v)));
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$strokeToSA = function (stroke) {
-	return _elm_lang$core$Native_List.fromArray(
-		[
-			_elm_lang$svg$Svg_Attributes$stroke(
-			_eskimoblood$elm_color_extra$Color_Convert$colorToHex(stroke.color)),
-			_elm_lang$svg$Svg_Attributes$strokeWidth(
-			_elm_lang$core$Basics$toString(stroke.width))
-		]);
-};
-var _ManuScriptHub$elm_diagram$Extra_Svg$bezierLineWithControlPoints = F5(
-	function (startPos, startControlPos, endControlPos, endPos, stroke) {
-		var dstr = A2(
-			_elm_lang$core$Basics_ops['++'],
-			'M ',
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				_ManuScriptHub$elm_diagram$Extra_Svg$vecToStringX_Y(startPos),
-				A2(
-					_elm_lang$core$Basics_ops['++'],
-					' C ',
-					A2(
-						_elm_lang$core$Basics_ops['++'],
-						_ManuScriptHub$elm_diagram$Extra_Svg$vecToStringX_Y(startControlPos),
-						A2(
-							_elm_lang$core$Basics_ops['++'],
-							', ',
-							A2(
-								_elm_lang$core$Basics_ops['++'],
-								_ManuScriptHub$elm_diagram$Extra_Svg$vecToStringX_Y(endControlPos),
-								A2(
-									_elm_lang$core$Basics_ops['++'],
-									', ',
-									_ManuScriptHub$elm_diagram$Extra_Svg$vecToStringX_Y(endPos))))))));
-		return A2(
-			_elm_lang$svg$Svg$path,
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$svg$Svg_Attributes$d(dstr),
-						_elm_lang$svg$Svg_Attributes$fill('transparent')
-					]),
-				_ManuScriptHub$elm_diagram$Extra_Svg$strokeToSA(stroke)),
+				F2(
+					function (v0, v1) {
+						return {ctor: '_Tuple2', _0: v0, _1: v1};
+					}),
+				'a',
+				'b')
+			])),
+	A2(
+		_ManuScriptHub$elm_diagram$DependencyGraph$update,
+		_ManuScriptHub$elm_diagram$DependencyGraph$AddVertices(
 			_elm_lang$core$Native_List.fromArray(
-				[]));
-	});
-var _ManuScriptHub$elm_diagram$Extra_Svg$bezierLineWithDirection = F5(
-	function (startPos, startDir, endDir, endPos, stroke) {
-		return A5(
-			_ManuScriptHub$elm_diagram$Extra_Svg$bezierLineWithControlPoints,
-			startPos,
-			A2(_elm_community$elm_linear_algebra$Math_Vector2$add, startPos, startDir),
-			A2(_elm_community$elm_linear_algebra$Math_Vector2$add, endPos, endDir),
-			endPos,
-			stroke);
-	});
-var _ManuScriptHub$elm_diagram$Extra_Svg$circle = F4(
-	function (pos, radius, stroke, fillcolor) {
-		return A2(
-			_elm_lang$svg$Svg$circle,
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$svg$Svg_Attributes$cx(
-						_ManuScriptHub$elm_diagram$Extra_Svg$vecXtoString(pos)),
-						_elm_lang$svg$Svg_Attributes$cy(
-						_ManuScriptHub$elm_diagram$Extra_Svg$vecYtoString(pos)),
-						_elm_lang$svg$Svg_Attributes$r(
-						_elm_lang$core$Basics$toString(radius)),
-						_elm_lang$svg$Svg_Attributes$fill(
-						_eskimoblood$elm_color_extra$Color_Convert$colorToHex(fillcolor))
-					]),
-				_ManuScriptHub$elm_diagram$Extra_Svg$strokeToSA(stroke)),
-			_elm_lang$core$Native_List.fromArray(
-				[]));
-	});
-var _ManuScriptHub$elm_diagram$Extra_Svg$arrow = F4(
-	function (targetPos, unnormalizedDirection, stroke, fillcolor) {
-		var fromdir = _elm_community$elm_linear_algebra$Math_Vector2$normalize(unnormalizedDirection);
-		var startPos = A2(
-			_elm_community$elm_linear_algebra$Math_Vector2$add,
-			targetPos,
-			A2(_elm_community$elm_linear_algebra$Math_Vector2$scale, 15, fromdir));
-		var rightdir = A2(
-			_elm_community$elm_linear_algebra$Math_Vector2$scale,
-			5,
-			A2(_ManuScriptHub$elm_diagram$Extra_MathVector2$rotate, fromdir, 90));
-		var leftdir = A2(_elm_community$elm_linear_algebra$Math_Vector2$scale, -1, rightdir);
-		var dstr = A2(
-			_elm_lang$core$Basics_ops['++'],
-			'M ',
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				_ManuScriptHub$elm_diagram$Extra_Svg$vecToStringX_Y(targetPos),
-				A2(
-					_elm_lang$core$Basics_ops['++'],
-					', ',
-					A2(
-						_elm_lang$core$Basics_ops['++'],
-						_ManuScriptHub$elm_diagram$Extra_Svg$vecToStringX_Y(
-							A2(_elm_community$elm_linear_algebra$Math_Vector2$add, startPos, rightdir)),
-						A2(
-							_elm_lang$core$Basics_ops['++'],
-							', ',
-							A2(
-								_elm_lang$core$Basics_ops['++'],
-								_ManuScriptHub$elm_diagram$Extra_Svg$vecToStringX_Y(
-									A2(_elm_community$elm_linear_algebra$Math_Vector2$add, startPos, leftdir)),
-								A2(
-									_elm_lang$core$Basics_ops['++'],
-									', ',
-									_ManuScriptHub$elm_diagram$Extra_Svg$vecToStringX_Y(targetPos))))))));
-		return A2(
-			_elm_lang$svg$Svg$path,
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$svg$Svg_Attributes$d(dstr),
-						_elm_lang$svg$Svg_Attributes$fill(
-						_eskimoblood$elm_color_extra$Color_Convert$colorToHex(fillcolor))
-					]),
-				_ManuScriptHub$elm_diagram$Extra_Svg$strokeToSA(stroke)),
-			_elm_lang$core$Native_List.fromArray(
-				[]));
-	});
-var _ManuScriptHub$elm_diagram$Extra_Svg$Stroke = F2(
-	function (a, b) {
-		return {color: a, width: b};
-	});
-var _ManuScriptHub$elm_diagram$Extra_Svg$redStroke = A2(_ManuScriptHub$elm_diagram$Extra_Svg$Stroke, _elm_lang$core$Color$red, 1);
-var _ManuScriptHub$elm_diagram$Extra_Svg$redThinStroke = A2(_ManuScriptHub$elm_diagram$Extra_Svg$Stroke, _elm_lang$core$Color$red, 0.3);
-var _ManuScriptHub$elm_diagram$Extra_Svg$blueThinStroke = A2(_ManuScriptHub$elm_diagram$Extra_Svg$Stroke, _elm_lang$core$Color$blue, 0.3);
-var _ManuScriptHub$elm_diagram$Extra_Svg$main = {
+				['b', 'd', 'a', 'c'])),
+		_ManuScriptHub$elm_diagram$DependencyGraph$init));
+var _ManuScriptHub$elm_diagram$DependencyGraph$main = {
 	main: A2(
-		_elm_lang$svg$Svg$svg,
+		_elm_lang$html$Html$div,
+		_elm_lang$core$Native_List.fromArray(
+			[]),
 		_elm_lang$core$Native_List.fromArray(
 			[
-				_elm_lang$svg$Svg_Attributes$version('1.1'),
-				_elm_lang$svg$Svg_Attributes$x('0'),
-				_elm_lang$svg$Svg_Attributes$y('0'),
-				_elm_lang$svg$Svg_Attributes$viewBox('0 0 323.141 322.95')
-			]),
-		_elm_lang$core$Native_List.fromArray(
-			[
-				A4(
-				_ManuScriptHub$elm_diagram$Extra_Svg$circle,
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 100, 10),
-				5,
-				_ManuScriptHub$elm_diagram$Extra_Svg$redThinStroke,
-				_elm_lang$core$Color$yellow),
-				A4(
-				_ManuScriptHub$elm_diagram$Extra_Svg$circle,
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 100, 20),
-				15,
-				_ManuScriptHub$elm_diagram$Extra_Svg$redStroke,
-				_elm_lang$core$Color$yellow),
-				A5(
-				_ManuScriptHub$elm_diagram$Extra_Svg$bezierLineWithDirection,
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 50, 40),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, 0),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, 0),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 150, 40),
-				_ManuScriptHub$elm_diagram$Extra_Svg$blueThinStroke),
-				A5(
-				_ManuScriptHub$elm_diagram$Extra_Svg$bezierLineWithDirection,
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 50, 50),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, 10),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, -10),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 150, 50),
-				_ManuScriptHub$elm_diagram$Extra_Svg$blueThinStroke),
-				A5(
-				_ManuScriptHub$elm_diagram$Extra_Svg$bezierLineWithDirection,
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 150, 50),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, 10),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, -10),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 250, 50),
-				_ManuScriptHub$elm_diagram$Extra_Svg$redThinStroke),
-				A5(
-				_ManuScriptHub$elm_diagram$Extra_Svg$bezierLineWithDirection,
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 50, 60),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, 20),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, -20),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 150, 60),
-				_ManuScriptHub$elm_diagram$Extra_Svg$blueThinStroke),
-				A5(
-				_ManuScriptHub$elm_diagram$Extra_Svg$bezierLineWithDirection,
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 150, 60),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, 20),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, -20),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 250, 60),
-				_ManuScriptHub$elm_diagram$Extra_Svg$redThinStroke)
+				_ManuScriptHub$elm_diagram$DependencyGraph$view(_ManuScriptHub$elm_diagram$DependencyGraph$uut)
 			]))
 };
-var _ManuScriptHub$elm_diagram$Connection$update = F2(
-	function (msg, model) {
-		var _p0 = msg;
-		return _ManuScriptHub$elm_diagram$Extra_Cmd$noFx(model);
-	});
-var _ManuScriptHub$elm_diagram$Connection$blackStroke = A2(_ManuScriptHub$elm_diagram$Extra_Svg$Stroke, _elm_lang$core$Color$black, 2);
-var _ManuScriptHub$elm_diagram$Connection$createEdge = F2(
-	function (fromModel, toModel) {
-		return _elm_lang$core$Native_List.fromArray(
-			[
-				A5(
-				_ManuScriptHub$elm_diagram$Extra_Svg$bezierLineWithDirection,
-				A2(
-					_elm_community$elm_linear_algebra$Math_Vector2$add,
-					fromModel.pos,
-					A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, 20)),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, 40),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, -60),
-				A2(
-					_elm_community$elm_linear_algebra$Math_Vector2$add,
-					toModel.pos,
-					A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, -20)),
-				_ManuScriptHub$elm_diagram$Connection$blackStroke),
-				A4(
-				_ManuScriptHub$elm_diagram$Extra_Svg$arrow,
-				A2(
-					_elm_community$elm_linear_algebra$Math_Vector2$add,
-					toModel.pos,
-					A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, -20)),
-				A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 0, -1),
-				_ManuScriptHub$elm_diagram$Connection$blackStroke,
-				_elm_lang$core$Color$red)
-			]);
-	});
-var _ManuScriptHub$elm_diagram$Connection$createEdges = function (nodes) {
-	var _p1 = nodes;
-	if ((_p1.ctor === '::') && (_p1._1.ctor === '::')) {
-		return A2(
-			_elm_lang$core$Basics_ops['++'],
-			A2(_ManuScriptHub$elm_diagram$Connection$createEdge, _p1._0, _p1._1._0),
-			_ManuScriptHub$elm_diagram$Connection$createEdges(
-				A2(_elm_lang$core$List$drop, 1, nodes)));
-	} else {
-		return _elm_lang$core$Native_List.fromArray(
-			[]);
-	}
-};
-var _ManuScriptHub$elm_diagram$Connection$view = function (model) {
-	var paths = _ManuScriptHub$elm_diagram$Connection$createEdges(model.symbols);
-	return A2(
-		_elm_lang$svg$Svg$g,
-		_elm_lang$core$Native_List.fromArray(
-			[]),
-		paths);
-};
-var _ManuScriptHub$elm_diagram$Connection$splineStyle = 'fill:transparent;stroke:red;stroke-width:2;z-index:-1000';
-var _ManuScriptHub$elm_diagram$Connection$Model = F4(
-	function (a, b, c, d) {
-		return {symbols: a, screenSize: b, width: c, stroke: d};
-	});
-var _ManuScriptHub$elm_diagram$Connection$init = F2(
-	function (symbols, size) {
-		return _ManuScriptHub$elm_diagram$Extra_Cmd$noFx(
-			A4(_ManuScriptHub$elm_diagram$Connection$Model, symbols, size, 3, _elm_lang$core$Color$black));
-	});
-var _ManuScriptHub$elm_diagram$Connection$NoOp = {ctor: 'NoOp'};
-var _ManuScriptHub$elm_diagram$Diagram$init = _ManuScriptHub$elm_diagram$Extra_Cmd$noFx(
-	{
-		size: A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 800, 600),
-		gridSize: A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 10, 10),
-		symbols: _elm_lang$core$Dict$empty,
-		connections: _elm_lang$core$Dict$empty
-	});
-var _ManuScriptHub$elm_diagram$Diagram$Model = F4(
-	function (a, b, c, d) {
-		return {size: a, gridSize: b, symbols: c, connections: d};
-	});
-var _ManuScriptHub$elm_diagram$Diagram$ModifyConnection = F2(
-	function (a, b) {
-		return {ctor: 'ModifyConnection', _0: a, _1: b};
-	});
-var _ManuScriptHub$elm_diagram$Diagram$viewConnection = function (_p0) {
-	var _p1 = _p0;
-	return A2(
-		_elm_lang$html$Html_App$map,
-		_ManuScriptHub$elm_diagram$Diagram$ModifyConnection(_p1._0),
-		_ManuScriptHub$elm_diagram$Connection$view(_p1._1));
-};
-var _ManuScriptHub$elm_diagram$Diagram$Modify = F2(
-	function (a, b) {
-		return {ctor: 'Modify', _0: a, _1: b};
-	});
-var _ManuScriptHub$elm_diagram$Diagram$update = F2(
-	function (msg, model) {
-		var _p2 = msg;
-		switch (_p2.ctor) {
-			case 'AddNode':
-				var newId = _elm_lang$core$Dict$size(model.symbols);
-				var _p3 = A5(_ManuScriptHub$elm_diagram$Symbol$init, newId, _ManuScriptHub$elm_diagram$Symbol$Circle, _p2._0, _p2._1, _p2._2);
-				var symbol = _p3._0;
-				var fx = _p3._1;
-				var newSym = A3(_elm_lang$core$Dict$insert, newId, symbol, model.symbols);
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{symbols: newSym}),
-					_1: A2(
-						_elm_lang$core$Platform_Cmd$map,
-						_ManuScriptHub$elm_diagram$Diagram$Modify(newId),
-						fx)
-				};
-			case 'Connect':
-				var syms = A2(
-					_elm_lang$core$List$filterMap,
-					function (i) {
-						return A2(_elm_lang$core$Dict$get, i, model.symbols);
-					},
-					_p2._0);
-				var _p4 = A2(_ManuScriptHub$elm_diagram$Connection$init, syms, model.size);
-				var c = _p4._0;
-				var cx = _p4._1;
-				var id = _elm_lang$core$Dict$size(model.connections);
-				var newConns = A3(_elm_lang$core$Dict$insert, id, c, model.connections);
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{connections: newConns}),
-					_1: A2(
-						_elm_lang$core$Platform_Cmd$map,
-						_ManuScriptHub$elm_diagram$Diagram$ModifyConnection(id),
-						cx)
-				};
-			case 'Modify':
-				var _p7 = _p2._0;
-				var _p5 = A2(_elm_lang$core$Dict$get, _p7, model.symbols);
-				if (_p5.ctor === 'Nothing') {
-					return _ManuScriptHub$elm_diagram$Extra_Cmd$noFx(model);
-				} else {
-					var _p6 = A2(_ManuScriptHub$elm_diagram$Symbol$update, _p2._1, _p5._0);
-					var sym$ = _p6._0;
-					var eff = _p6._1;
-					var updatedSymbols = A3(
-						_elm_lang$core$Dict$update,
-						_p7,
-						function (mbSym) {
-							return _elm_lang$core$Maybe$Just(sym$);
-						},
-						model.symbols);
-					return {
-						ctor: '_Tuple2',
-						_0: _elm_lang$core$Native_Utils.update(
-							model,
-							{symbols: updatedSymbols}),
-						_1: A2(
-							_elm_lang$core$Platform_Cmd$map,
-							_ManuScriptHub$elm_diagram$Diagram$Modify(_p7),
-							eff)
-					};
-				}
-			default:
-				return _ManuScriptHub$elm_diagram$Extra_Cmd$noFx(model);
-		}
-	});
-var _ManuScriptHub$elm_diagram$Diagram$viewSymbol = function (_p8) {
-	var _p9 = _p8;
-	var _p11 = _p9._1;
-	var _p10 = _p9._0;
-	var pos = _p11.pos;
-	return A2(
-		_elm_lang$svg$Svg$g,
-		_elm_lang$core$Native_List.fromArray(
-			[]),
-		_elm_lang$core$Native_List.fromArray(
-			[
-				A2(
-				_elm_lang$html$Html_App$map,
-				_ManuScriptHub$elm_diagram$Diagram$Modify(_p10),
-				_ManuScriptHub$elm_diagram$Symbol$view(_p11)),
-				A2(
-				_elm_lang$svg$Svg$text$,
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$svg$Svg_Attributes$x(
-						_ManuScriptHub$elm_diagram$Extra_Svg$sx(pos)),
-						_elm_lang$svg$Svg_Attributes$y(
-						_ManuScriptHub$elm_diagram$Extra_Svg$sy(pos))
-					]),
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$svg$Svg$text(
-						_elm_lang$core$Basics$toString(_p10))
-					]))
-			]));
-};
-var _ManuScriptHub$elm_diagram$Diagram$view = function (model) {
-	var _p12 = {
-		ctor: '_Tuple2',
-		_0: _elm_lang$core$Basics$toString(
-			_elm_community$elm_linear_algebra$Math_Vector2$getX(model.size)),
-		_1: _elm_lang$core$Basics$toString(
-			_elm_community$elm_linear_algebra$Math_Vector2$getY(model.size))
-	};
-	var sw = _p12._0;
-	var sh = _p12._1;
-	return A2(
-		_elm_lang$svg$Svg$svg,
-		_elm_lang$core$Native_List.fromArray(
-			[
-				_elm_lang$svg$Svg_Attributes$width(sw),
-				_elm_lang$svg$Svg_Attributes$height(sh),
-				_elm_lang$svg$Svg_Attributes$viewBox(
-				A2(
-					_elm_lang$core$Basics_ops['++'],
-					'0 0 ',
-					A2(
-						_elm_lang$core$Basics_ops['++'],
-						sw,
-						A2(_elm_lang$core$Basics_ops['++'], ' ', sh))))
-			]),
-		A2(
-			_elm_lang$core$Basics_ops['++'],
-			A2(
-				_elm_lang$core$List$map,
-				_ManuScriptHub$elm_diagram$Diagram$viewSymbol,
-				_elm_lang$core$Dict$toList(model.symbols)),
-			A2(
-				_elm_lang$core$List$map,
-				_ManuScriptHub$elm_diagram$Diagram$viewConnection,
-				_elm_lang$core$Dict$toList(model.connections))));
-};
-var _ManuScriptHub$elm_diagram$Diagram$Connect = function (a) {
-	return {ctor: 'Connect', _0: a};
-};
-var _ManuScriptHub$elm_diagram$Diagram$AddNode = F3(
-	function (a, b, c) {
-		return {ctor: 'AddNode', _0: a, _1: b, _2: c};
-	});
-var _ManuScriptHub$elm_diagram$Basic$bodyStyle = _elm_lang$html$Html_Attributes$style(
-	_elm_lang$core$Native_List.fromArray(
-		[
-			A2(
-			F2(
-				function (v0, v1) {
-					return {ctor: '_Tuple2', _0: v0, _1: v1};
-				}),
-			'width',
-			'920px'),
-			A2(
-			F2(
-				function (v0, v1) {
-					return {ctor: '_Tuple2', _0: v0, _1: v1};
-				}),
-			'margin',
-			'auto'),
-			A2(
-			F2(
-				function (v0, v1) {
-					return {ctor: '_Tuple2', _0: v0, _1: v1};
-				}),
-			'border',
-			'1px solid black'),
-			A2(
-			F2(
-				function (v0, v1) {
-					return {ctor: '_Tuple2', _0: v0, _1: v1};
-				}),
-			'background-color',
-			'#EEEEEE')
-		]));
-var _ManuScriptHub$elm_diagram$Basic$template = A2(
-	_elm_lang$html$Html$img,
-	_elm_lang$core$Native_List.fromArray(
-		[
-			_elm_lang$html$Html_Attributes$style(
-			_elm_lang$core$Native_List.fromArray(
-				[
-					A2(
-					F2(
-						function (v0, v1) {
-							return {ctor: '_Tuple2', _0: v0, _1: v1};
-						}),
-					'position',
-					'absolute'),
-					A2(
-					F2(
-						function (v0, v1) {
-							return {ctor: '_Tuple2', _0: v0, _1: v1};
-						}),
-					'top',
-					'-10px'),
-					A2(
-					F2(
-						function (v0, v1) {
-							return {ctor: '_Tuple2', _0: v0, _1: v1};
-						}),
-					'left',
-					'35px'),
-					A2(
-					F2(
-						function (v0, v1) {
-							return {ctor: '_Tuple2', _0: v0, _1: v1};
-						}),
-					'border',
-					'1px solid black'),
-					A2(
-					F2(
-						function (v0, v1) {
-							return {ctor: '_Tuple2', _0: v0, _1: v1};
-						}),
-					'opacity',
-					'0.1'),
-					A2(
-					F2(
-						function (v0, v1) {
-							return {ctor: '_Tuple2', _0: v0, _1: v1};
-						}),
-					'z-index',
-					'2')
-				])),
-			_elm_lang$html$Html_Attributes$src('https://raw.githubusercontent.com/elm-lang/projects/master/compiler-progress-visualization/mock.gif')
-		]),
-	_elm_lang$core$Native_List.fromArray(
-		[]));
-var _ManuScriptHub$elm_diagram$Basic$toVec = function (_p0) {
-	var _p1 = _p0;
-	return A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, _p1._0, _p1._1);
-};
-var _ManuScriptHub$elm_diagram$Basic$sampleCons3 = _elm_lang$core$Native_List.fromArray(
-	[
-		_elm_lang$core$Native_List.fromArray(
-		[0, 3, 5, 8]),
-		_elm_lang$core$Native_List.fromArray(
-		[1, 3, 4, 6]),
-		_elm_lang$core$Native_List.fromArray(
-		[2, 5, 7])
-	]);
-var _ManuScriptHub$elm_diagram$Basic$sampleCons2 = _elm_lang$core$Native_List.fromArray(
-	[
-		_elm_lang$core$Native_List.fromArray(
-		[0, 3, 4, 6]),
-		_elm_lang$core$Native_List.fromArray(
-		[1, 3, 5, 7]),
-		_elm_lang$core$Native_List.fromArray(
-		[2, 5, 8])
-	]);
-var _ManuScriptHub$elm_diagram$Basic$sampleCons4 = _elm_lang$core$Native_List.fromArray(
-	[
-		_elm_lang$core$Native_List.fromArray(
-		[0, 1, 2, 8, 7, 6, 4, 3, 5])
-	]);
-var _ManuScriptHub$elm_diagram$Basic$sampleCons = _elm_lang$core$Native_List.fromArray(
-	[
-		_elm_lang$core$Native_List.fromArray(
-		[0, 1, 2, 3, 4, 5, 6, 7, 8])
-	]);
-var _ManuScriptHub$elm_diagram$Basic_ops = _ManuScriptHub$elm_diagram$Basic_ops || {};
-_ManuScriptHub$elm_diagram$Basic_ops['=>'] = F2(
-	function (v0, v1) {
-		return {ctor: '_Tuple2', _0: v0, _1: v1};
-	});
-var _ManuScriptHub$elm_diagram$Basic$sample = _elm_lang$core$Native_List.fromArray(
-	[
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 70, 50),
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 210, 50),
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 350, 50),
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 130, 150),
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 70, 250),
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 270, 250),
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 50, 350),
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 190, 350),
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 330, 350)
-	]);
-var _ManuScriptHub$elm_diagram$Basic$sample2 = _elm_lang$core$Native_List.fromArray(
-	[
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 60, 60),
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 220, 300),
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 420, 300),
-		A2(_ManuScriptHub$elm_diagram$Basic_ops['=>'], 700, 240)
-	]);
-var _ManuScriptHub$elm_diagram$Basic$Model = function (a) {
-	return {diagram: a};
-};
-var _ManuScriptHub$elm_diagram$Basic$DiagramMsg = function (a) {
-	return {ctor: 'DiagramMsg', _0: a};
-};
-var _ManuScriptHub$elm_diagram$Basic$update = F2(
-	function (msg, model) {
-		var _p2 = msg;
-		if (_p2.ctor === 'NoOp') {
-			return _ManuScriptHub$elm_diagram$Extra_Cmd$noFx(model);
-		} else {
-			var _p3 = A2(_ManuScriptHub$elm_diagram$Diagram$update, _p2._0, model.diagram);
-			var d = _p3._0;
-			var fx = _p3._1;
-			return {
-				ctor: '_Tuple2',
-				_0: _elm_lang$core$Native_Utils.update(
-					model,
-					{diagram: d}),
-				_1: A2(_elm_lang$core$Platform_Cmd$map, _ManuScriptHub$elm_diagram$Basic$DiagramMsg, fx)
-			};
-		}
-	});
-var _ManuScriptHub$elm_diagram$Basic$init = function () {
-	var _p4 = _ManuScriptHub$elm_diagram$Diagram$init;
-	var d = _p4._0;
-	var dx = _p4._1;
-	var m0 = {
-		ctor: '_Tuple2',
-		_0: {diagram: d},
-		_1: _elm_lang$core$Platform_Cmd$batch(
-			_elm_lang$core$Native_List.fromArray(
-				[
-					A2(_elm_lang$core$Platform_Cmd$map, _ManuScriptHub$elm_diagram$Basic$DiagramMsg, dx)
-				]))
-	};
-	var msgs$ = A2(
-		_elm_lang$core$List$map,
-		function (a) {
-			return _ManuScriptHub$elm_diagram$Basic$DiagramMsg(
-				_ManuScriptHub$elm_diagram$Diagram$Connect(a));
-		},
-		_ManuScriptHub$elm_diagram$Basic$sampleCons3);
-	var msgs = A2(
-		_elm_lang$core$List$map,
-		function (s) {
-			return _ManuScriptHub$elm_diagram$Basic$DiagramMsg(
-				A3(
-					_ManuScriptHub$elm_diagram$Diagram$AddNode,
-					_elm_lang$core$Color$white,
-					A2(_elm_community$elm_linear_algebra$Math_Vector2$vec2, 20, 20),
-					_ManuScriptHub$elm_diagram$Basic$toVec(s)));
-		},
-		_ManuScriptHub$elm_diagram$Basic$sample);
-	return A3(
-		_ManuScriptHub$elm_diagram$Extra_Cmd$updateMany,
-		A2(_elm_lang$core$Basics_ops['++'], msgs, msgs$),
-		_ManuScriptHub$elm_diagram$Basic$update,
-		m0);
-}();
-var _ManuScriptHub$elm_diagram$Basic$diagram = function (model) {
-	return A2(
-		_elm_lang$html$Html$div,
-		_elm_lang$core$Native_List.fromArray(
-			[
-				_elm_lang$html$Html_Attributes$style(
-				_elm_lang$core$Native_List.fromArray(
-					[
-						A2(
-						F2(
-							function (v0, v1) {
-								return {ctor: '_Tuple2', _0: v0, _1: v1};
-							}),
-						'z-index',
-						'1'),
-						A2(
-						F2(
-							function (v0, v1) {
-								return {ctor: '_Tuple2', _0: v0, _1: v1};
-							}),
-						'opacity',
-						'1')
-					]))
-			]),
-		_elm_lang$core$Native_List.fromArray(
-			[
-				A2(
-				_elm_lang$html$Html_App$map,
-				_ManuScriptHub$elm_diagram$Basic$DiagramMsg,
-				_ManuScriptHub$elm_diagram$Diagram$view(model.diagram))
-			]));
-};
-var _ManuScriptHub$elm_diagram$Basic$view = function (model) {
-	return A2(
-		_elm_lang$html$Html$div,
-		_elm_lang$core$Native_List.fromArray(
-			[_ManuScriptHub$elm_diagram$Basic$bodyStyle]),
-		_elm_lang$core$Native_List.fromArray(
-			[
-				A2(
-				_elm_lang$html$Html$div,
-				_elm_lang$core$Native_List.fromArray(
-					[]),
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_ManuScriptHub$elm_diagram$Basic$diagram(model),
-						_ManuScriptHub$elm_diagram$Basic$template
-					])),
-				A2(
-				_elm_lang$html$Html$div,
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$html$Html_Attributes$style(
-						_elm_lang$core$Native_List.fromArray(
-							[
-								A2(
-								F2(
-									function (v0, v1) {
-										return {ctor: '_Tuple2', _0: v0, _1: v1};
-									}),
-								'clear',
-								'both'),
-								A2(
-								F2(
-									function (v0, v1) {
-										return {ctor: '_Tuple2', _0: v0, _1: v1};
-									}),
-								'position',
-								'relative')
-							]))
-					]),
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$html$Html$text(
-						_elm_lang$core$Basics$toString(model))
-					]))
-			]));
-};
-var _ManuScriptHub$elm_diagram$Basic$main = {
-	main: _elm_lang$html$Html_App$program(
-		{
-			init: _ManuScriptHub$elm_diagram$Basic$init,
-			view: _ManuScriptHub$elm_diagram$Basic$view,
-			update: _ManuScriptHub$elm_diagram$Basic$update,
-			subscriptions: function (_p5) {
-				return _elm_lang$core$Platform_Sub$none;
-			}
-		})
-};
-var _ManuScriptHub$elm_diagram$Basic$NoOp = {ctor: 'NoOp'};
 var Elm = {};
-Elm['Basic'] = Elm['Basic'] || {};
-_elm_lang$core$Native_Platform.addPublicModule(Elm['Basic'], 'Basic', typeof _ManuScriptHub$elm_diagram$Basic$main === 'undefined' ? null : _ManuScriptHub$elm_diagram$Basic$main);
+Elm['DependencyGraph'] = Elm['DependencyGraph'] || {};
+_elm_lang$core$Native_Platform.addPublicModule(Elm['DependencyGraph'], 'DependencyGraph', typeof _ManuScriptHub$elm_diagram$DependencyGraph$main === 'undefined' ? null : _ManuScriptHub$elm_diagram$DependencyGraph$main);
 
 if (typeof define === "function" && define['amd'])
 {
@@ -9496,4 +7475,4 @@ for (var publicModule in Elm)
 }
 
 }).call(this);
-</script></head><body><script type="text/javascript">Elm.Basic.fullscreen()</script></body></html>
+</script></head><body><script type="text/javascript">Elm.DependencyGraph.fullscreen()</script></body></html>

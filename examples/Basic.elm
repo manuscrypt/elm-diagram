@@ -8,8 +8,7 @@ import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY, sub)
 import Svg exposing (Svg)
 import Extra.Cmd exposing (noFx, updateOne, updateMany)
 import Diagram exposing (..)
-import Symbol
-
+import Symbol exposing (..)
 
 type alias Model =
     { diagram : Diagram.Model
@@ -78,14 +77,14 @@ toVec ( x, y ) =
 init : ( Model, Cmd Msg )
 init =
     let
-        msgs =
-            List.map (\s -> DiagramMsg <| AddNode Color.white (vec2 20 20) <| toVec s) sample
+        syms =
+            fst <| List.unzip <| List.indexedMap (\i s -> Symbol.init i Color.white (vec2 20 20) <| toVec s) sample
 
         msgs' =
             List.map (\a -> DiagramMsg <| Connect a) sampleCons3
 
-        ( d, dx ) =
-            Diagram.init
+        ( d, dx ) = 
+            Diagram.init syms []
 
         m0 =
             ( { diagram = d
@@ -93,7 +92,7 @@ init =
             , Cmd.batch [ Cmd.map DiagramMsg dx ]
             )
     in
-        updateMany (msgs ++ msgs') update m0
+        updateMany (msgs') update m0
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )

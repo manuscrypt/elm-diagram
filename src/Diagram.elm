@@ -2,102 +2,102 @@ module Diagram exposing (..)
 
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
 import Html.App as App
-import Color exposing (Color)
 import Dict exposing (insert)
 import Symbol
 import Connection
 import Svg exposing (Svg)
 import Svg.Attributes as SA
 import Extra.Cmd exposing (noFx)
-import Extra.Svg exposing (sx, sy)
+import Layout
+import DependencyGraph exposing (Edge, Vertex)
+import Tuple2
 
---import Ball
-
-
-type alias Model =
+type alias Model=
     { size : Vec2
     , gridSize : Vec2
     , symbols : Dict.Dict Int Symbol.Model
-    , connections : Dict.Dict Int Connection.Model
+    , connections : List Connection.Model
     }
 
 
 type Msg
-    = AddNode Color Vec2 Vec2
+    = AddSymbol (Symbol.Model)
     | Connect (List Int)
-    | Modify Int Symbol.Msg
-    | ModifyConnection Int Connection.Msg
+    | Modify Int (Symbol.Msg)
+    | NoOp
 
-
-init : ( Model, Cmd Msg )
-init =
-    noFx
+init : List Symbol.Model -> List Connection.Model -> ( Model, Cmd Msg )
+init syms conns =
         { size = vec2 800 600
         , gridSize = vec2 10 10
-        , symbols = Dict.empty
-        , connections = Dict.empty
-        }
+        , symbols = Dict.fromList <| List.map (\r -> (r.id,r)) syms
+        , connections = conns
+        } ! []
 
+createSymbols: List Layout.LayoutNode -> (List  Symbol.Model, List (Cmd Symbol.Msg))
+createSymbols nodes = 
+    List.unzip <| List.indexedMap (\i node -> Symbol.init i node.color (vec2 20 20) node.pos ) nodes 
+
+createConnection: List Symbol.Model -> Layout.Model a -> Edge a -> Connection.Model
+createConnection symbols layout edge = 
+    let cells = edgeToCells edge layout 
+        syms = cellsToSymbols cells symbols
+    in Connection.init syms 
+
+
+cellsToSymbols: List (Layout.LayoutCell a) -> List Symbol.Model -> List Symbol.Model
+cellsToSymbols cells symbols =
+    let idxs = List.map .index cells
+    in List.filter (\s -> List.member s.id idxs) symbols 
+
+edgeToCells: Edge a -> Layout.Model a -> List (Layout.LayoutCell a)
+edgeToCells e layout =
+    let vs = Tuple2.toList e
+    in List.filterMap (Layout.getCell layout) vs
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        AddNode color size pos ->
+        NoOp -> model ! []
+        AddSymbol symbol ->
             let
-                newId =
-                    Dict.size model.symbols
-
-                ( symbol, fx ) =
-                    Symbol.init newId Symbol.Circle color size pos
-
                 newSym =
-                    insert newId symbol model.symbols
+                    insert symbol.id symbol model.symbols
             in
-                ( { model | symbols = newSym }, Cmd.map (Modify newId) fx )
+                { model | symbols = newSym } ! []
 
         Connect ints ->
             let
-                id =
-                    (Dict.size model.connections)
-
                 syms =
                     List.filterMap (\i -> Dict.get i model.symbols) ints
 
-                ( c, cx ) =
-                    Connection.init syms model.size
-
-                newConns =
-                    Dict.insert id c model.connections
             in
-                ( { model | connections = newConns }, Cmd.map (ModifyConnection id) cx )
+                { model | connections = model.connections ++ [Connection.init syms] } ! []
 
         Modify id msg ->
             case Dict.get id model.symbols of
-                Nothing -> noFx model
-                Just sym ->
-                    let (sym', eff) = Symbol.update msg sym
-                        updatedSymbols = Dict.update id (\mbSym -> Just sym' ) model.symbols
-                    in ( { model | symbols = updatedSymbols }, Cmd.map (Modify id) eff )
+                Nothing ->
+                    noFx model
 
-        ModifyConnection id msg ->
-            noFx model
+                Just sym ->
+                    let
+                        ( sym', eff ) =
+                            Symbol.update msg sym
+
+                        updatedSymbols =
+                            Dict.update id (\mbSym -> Just sym') model.symbols
+                    in
+                        ( { model | symbols = updatedSymbols }, Cmd.map (Modify id) eff )
 
 
 viewSymbol : ( Int, Symbol.Model ) -> Svg Msg
 viewSymbol ( id, sym ) =
-    let
-        pos =
-            sym.pos
-    in
-        Svg.g []
-            [ App.map (Modify id) (Symbol.view sym)
-            , Svg.text' [ SA.x <| sx pos, SA.y <| sy pos ] [ Svg.text <| toString id ]
-            ]
+    App.map (Modify id) (Symbol.view sym)
 
 
-viewConnection : ( Int, Connection.Model ) -> Svg Msg
-viewConnection ( id, con ) =
-    App.map (ModifyConnection id) (Connection.view con)
+viewConnection : Connection.Model -> Svg Msg
+viewConnection con =
+    App.map (\_ -> NoOp) (Connection.view con)
 
 
 view : Model -> Svg Msg
@@ -106,19 +106,10 @@ view model =
         ( sw, sh ) =
             ( toString <| getX model.size, toString <| getY model.size )
     in
-        Svg.svg
+        let symbols = List.map viewSymbol <| Dict.toList model.symbols
+            connections = List.map viewConnection model.connections 
+        in Svg.svg
             [ SA.width sw
             , SA.height sh
             , SA.viewBox <| "0 0 " ++ sw ++ " " ++ sh
-            ]
-            ((List.map viewSymbol
-                <| Dict.toList model.symbols
-             )
-                ++ (List.map viewConnection <| Dict.toList model.connections)
-            )
-
--- subscriptions : Model -> Sub Msg
--- subscriptions model =
---     Sub.batch
---         ( Dict.values <| Dict.map (\k v -> Sub.map (Modify k) <| Symbol.subscriptions v ) model.symbols
---         )
+            ] ( symbols ++ connections )

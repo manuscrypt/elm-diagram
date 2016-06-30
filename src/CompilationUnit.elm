@@ -11,25 +11,21 @@ type CompilationStatus
 type alias Model =
       { filename: Filename
       , status: CompilationStatus
-      , deps: Dependencies
       }
-
-type Dependencies = Dependencies (List Model)
 
 type Msg
   = SetStatus CompilationStatus
-  | AddDependencies Dependencies
 
-init: String->(Model, Cmd Msg)
+init: String->Model
 init filename =
-  { filename = filename, status = Unknown, deps = (Dependencies []) } ! []
+  { filename = filename, status = Unknown } 
 
-update: Msg -> Model-> (Model, Cmd Msg)
+update: Msg -> Model->Model
 update msg model =
   case msg of
     SetStatus status ->
-      { model | status = status } ! []
+      { model | status = status }
 
-    AddDependencies (Dependencies deps) ->
-      let (Dependencies oldDeps) = model.deps
-      in { model | deps = Dependencies (oldDeps ++ deps) } ! []
+fromList: List String -> List Model
+fromList strs = 
+  List.map init strs
