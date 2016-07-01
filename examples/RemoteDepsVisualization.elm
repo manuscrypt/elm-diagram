@@ -113,7 +113,7 @@ update msg model =
                                 (Graph.inducedSubgraph [ basicId ] newGraph)
 
                             Just ctx ->
-                                (Graph.inducedSubgraph ([ basicId ] ++ (IntDict.keys ctx.incoming)) newGraph)
+                                (Graph.inducedSubgraph ([ basicId ] ++ (IntDict.keys ctx.outgoing)) newGraph)
                 in
                     fromGraph subGraph model.size
 

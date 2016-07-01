@@ -48,8 +48,14 @@ createNode size ( index, cell ) =
         spacing =
             80
 
+        sgn =
+            if ((%) index 2) == 0 then
+                -1
+            else
+                1
+
         x =
-            spacing + (toFloat index * spacing)
+            450 + sgn * (spacing + (toFloat ((%) index 3) * spacing / 2))
 
         y =
             spacing + (toFloat index * spacing)
