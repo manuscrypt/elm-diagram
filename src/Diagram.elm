@@ -73,7 +73,7 @@ viewSymbol ( id, sym ) =
 
 viewConnection : Connection.Model -> Svg Msg
 viewConnection con =
-    App.map (\_ -> NoOp) (Connection.view con)
+    Connection.view con
 
 
 view : Model -> Svg Msg

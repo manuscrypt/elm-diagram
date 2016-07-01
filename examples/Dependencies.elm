@@ -3,15 +3,17 @@ module Dependencies exposing (..)
 import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
 import Html exposing (Html)
 import Html.App as App
+import Html.Events as HE
 import Http 
 import Task 
-import String 
 import ElmFile exposing (ElmFile, decodeList) 
+import ElmFileGraph exposing (fromFiles) 
 import GraphListView 
 
 type alias Model 
     = { graph : Graph ElmFile ()
       , graphView: GraphListView.Model ElmFile () 
+      , labelFn: (Node ElmFile -> String)
       , error: String
       }
 
@@ -32,9 +34,11 @@ main =
 init: (Model, Cmd Msg)
 init = 
     let g = Graph.empty
-        (gv, gvx) = GraphListView.init g (\x -> x.label.name)
+        labelFn = (\x -> x.label.name ++ " (" ++ x.label.moduleName ++ ")")
+        (gv, gvx) = GraphListView.init g labelFn
     in { graph = g
        , graphView = gv  
+       , labelFn = labelFn
        , error = "no error" 
        } ! [ fetchData, Cmd.map GraphListViewMsg gvx ] 
 
@@ -50,8 +54,8 @@ update msg model =
             { model | error = toString err } ! []
 
         DataFetched elmFiles ->
-             let newGraph = fromFiles elmFiles
-                 (newView, newViewFx) = GraphListView.init newGraph (\x -> x.label.name) 
+             let newGraph = ElmFileGraph.fromFiles elmFiles
+                 (newView, newViewFx) = GraphListView.init newGraph model.labelFn 
             in { model | graph = newGraph, graphView = newView } 
                     ! [Cmd.map GraphListViewMsg newViewFx]
 
@@ -59,30 +63,9 @@ update msg model =
             let (gv, gvx) = GraphListView.update msg model.graphView
             in { model | graphView = gv } ! [Cmd.map GraphListViewMsg gvx]
 
-fromFiles: List ElmFile -> Graph ElmFile ()
-fromFiles files =
-    let nodes = List.map (\o -> Node o.id o) files
-        edges = makeEdges files 
-    in Graph.fromNodesAndEdges nodes edges
-
-makeEdges: List ElmFile -> List (Edge ())
-makeEdges files =
-    List.foldl (makeEdge files) [] files
-
-makeEdge: List ElmFile -> ElmFile -> List (Edge ())-> List (Edge ())
-makeEdge all file edges = 
-    let imps = List.filterMap (findFile all) file.imports
-    in edges ++ (List.map (\f -> Edge file.id f.id ()) imps) 
-
-findFile: List ElmFile -> String -> Maybe ElmFile
-findFile files name =
-    Maybe.oneOf 
-        [ List.head <| List.filter (\f -> f.moduleName == name ) files
-        , List.head <| List.filter (\f -> (String.dropRight 4 f.name) == name ) files
-        ]
-
 view: Model -> Html Msg
 view model =
-    Html.div [] [ Html.div [] [Html.text <| "Error " ++ toString model.error ]
-                , App.map GraphListViewMsg <| GraphListView.view model.graphView  
-                ]
+    App.map GraphListViewMsg <| GraphListView.view model.graphView  
+
+    -- Html.div [] [ Html.div [] [Html.text <| "Error " ++ toString model.error ]
+    --             ]

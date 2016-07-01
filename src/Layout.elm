@@ -5,6 +5,7 @@ import Color exposing (Color)
 import Dict exposing (Dict)
 import IntDict
 import Graph exposing (Graph,Node,NodeContext)
+import Extra.Graph exposing (noIncoming)
 
 type alias LayoutNode =
     { pos : Vec2
@@ -29,11 +30,6 @@ init : Graph a b -> (Node a->String) -> Model a b
 init g labelFunc =
     List.foldl addContent ({ graph = g, cells = Dict.empty, labelFunc = labelFunc }) 
         <| List.map .node <| noIncoming g
-
-noIncoming: Graph a b -> List (NodeContext a b) 
-noIncoming g = 
-    let noInc ctx = (IntDict.size ctx.incoming == 0)
-    in Graph.fold (\ctx acc -> if noInc ctx then acc ++ [ctx] else acc) [] g
 
 addContent : Node a -> Model a b -> Model a b
 addContent content model =
@@ -70,7 +66,7 @@ createNode : Int -> LayoutCell a -> LayoutNode
 createNode index cell =
     let
         x =
-            30 + ((toFloat index) * 80)
+            100 + ((toFloat index) * 80)
 
         y =
             30 + ((toFloat index) * 80)
