@@ -65,7 +65,6 @@ update msg model =
 
 view: Model -> Html Msg
 view model =
-    App.map GraphListViewMsg <| GraphListView.view model.graphView  
-
-    -- Html.div [] [ Html.div [] [Html.text <| "Error " ++ toString model.error ]
-    --             ]
+    Html.div [] [ Html.div [] [Html.text <| "Error " ++ toString model.error ]
+                , App.map GraphListViewMsg <| GraphListView.view model.graphView
+                ]

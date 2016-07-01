@@ -37,11 +37,12 @@ addContent content model =
         newIndex =
             Dict.size model.cells
 
-        newCell =
-            LayoutCell content newIndex model.labelFunc
-
-        withContent =
-            { model | cells = Dict.insert newIndex newCell model.cells }
+        withContent = 
+            case Dict.get content.id model.cells of 
+                Nothing -> 
+                    { model | cells = Dict.insert newIndex (LayoutCell content newIndex model.labelFunc) model.cells }
+                Just c ->
+                    model
 
         deps = 
             case Graph.get content.id model.graph of
