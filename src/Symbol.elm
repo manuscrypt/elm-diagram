@@ -53,10 +53,10 @@ view model =
     let
         label = Svg.text'
                 [ SA.x "0"
-                , SA.y "1"
+                , SA.y "25"
                 , SA.textAnchor "middle"
                 , SA.alignmentBaseline "middle"
-                , SA.style "font-weight:bold; font-size:25; font-family: Courier"
+                , SA.style "font-weight:bold; font-size:15; font-family: Courier; fill: black;"
                 ] [ Svg.text model.label ]
     in 
         Svg.g

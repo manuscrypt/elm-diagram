@@ -1,6 +1,6 @@
-module Extra.Graph exposing (isAcyclic, noIncoming)
+module Extra.Graph exposing (isAcyclic, noIncoming, incCount, outCount)
 
-import Graph exposing (Graph, NodeContext)
+import Graph exposing (Graph, NodeContext, Node)
 import IntDict
 
 isAcyclic: Graph a b -> Bool
@@ -12,3 +12,15 @@ noIncoming: Graph a b -> List (NodeContext a b)
 noIncoming g = 
     let noInc ctx = (IntDict.size ctx.incoming == 0)
     in Graph.fold (\ctx acc -> if noInc ctx then acc ++ [ctx] else acc) [] g
+
+incCount: Node a -> Graph a b -> Int
+incCount node graph =  
+    Maybe.withDefault 0
+        <| Maybe.map (\ctx -> IntDict.size ctx.incoming)
+        <| Graph.get node.id graph
+
+outCount: Node a -> Graph a b -> Int
+outCount node graph =  
+    Maybe.withDefault 0
+        <| Maybe.map (\ctx -> IntDict.size ctx.outgoing)
+        <| Graph.get node.id graph

@@ -88,4 +88,5 @@ view model =
             [ SA.width sw
             , SA.height sh
             , SA.viewBox <| "0 0 " ++ sw ++ " " ++ sh
+            , SA.textRendering "optimizeLegibility"
             ] ( symbols ++ connections )

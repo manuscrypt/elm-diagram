@@ -69,7 +69,7 @@ update msg model =
             { model | error = toString err } ! []
 
         DataFetched elmFiles ->
-            let newGraph = fromFiles <| List.filter (\e -> String.length e.moduleName > 0 ) elmFiles
+            let newGraph = fromFiles elmFiles --<| List.filter (\e -> String.length e.moduleName > 0 ) elmFiles
             in
                 let basicId = idFor "Basic.elm" elmFiles
                     basicCtx = Graph.get basicId newGraph
@@ -77,7 +77,7 @@ update msg model =
                         Nothing ->
                             fromGraph <| Graph.inducedSubgraph [basicId ] newGraph
                         Just ctx ->
-                            fromGraph <| Graph.inducedSubgraph ([basicId]++(IntDict.keys ctx.outgoing)) newGraph
+                            fromGraph <| Graph.inducedSubgraph ([basicId]++(IntDict.keys ctx.incoming)) newGraph
                 in 
                     if not(Extra.Graph.isAcyclic bg.graph) then
                         Debug.crash "not acyclic"
@@ -109,6 +109,7 @@ view model =
         , Html.div [ HA.style [(,) "display" "flex", (,) "flex-direction" "column"]]
             [ Html.div[ HA.style [ (,) "flex" "auto" ] ] [ diagram model ]
             , Html.div[ HA.style [ (,) "flex" "auto" ] ] [ App.map GraphViewMsg <| GraphListView.view model.graphView ]
+            , Html.div[ HA.style [ (,) "flex" "auto" ] ] [ Html.text <| Graph.toString' model.graph ]
             ]
         , Html.div
             [ HA.style

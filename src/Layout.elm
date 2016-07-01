@@ -4,89 +4,68 @@ import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY, sub)
 import Color exposing (Color)
 import Dict exposing (Dict)
 import IntDict
-import Graph exposing (Graph,Node,NodeContext)
-import Extra.Graph exposing (noIncoming)
+import Graph exposing (Graph, Node, NodeContext)
+--import Extra.Graph exposing (noIncoming, incCount, outCount)
+
 
 type alias LayoutNode =
-    { pos : Vec2
+    { id : Int
+    , pos : Vec2
     , color : Color
     , label : String
     }
 
+
 type alias LayoutCell a =
     { content : Node a
-    , index : Int
-    , labelFunc: (Node a->String)
+    , labelFunc : Node a -> String
     }
 
 
 type alias Model a b =
     { graph : Graph a b
     , cells : Dict Int (LayoutCell a)
-    , labelFunc: (Node a->String)
+    , labelFunc : Node a -> String
     }
 
-init : Graph a b -> (Node a->String) -> Model a b
+
+init : Graph a b -> (Node a -> String) -> Model a b
 init g labelFunc =
-    List.foldl addContent ({ graph = g, cells = Dict.empty, labelFunc = labelFunc }) 
-        <| List.map .node <| noIncoming g
+    List.foldl addContent ({ graph = g, cells = Dict.empty, labelFunc = labelFunc })
+        <| Graph.nodes g
+        --<| List.map .node
+--        <| noIncoming g
+
 
 addContent : Node a -> Model a b -> Model a b
 addContent content model =
     let
-        newIndex =
-            Dict.size model.cells
+        withContent =
+            case Dict.get content.id model.cells of
+                Nothing ->
+                    { model | cells = Dict.insert content.id (LayoutCell content model.labelFunc) model.cells }
 
-        withContent = 
-            case Dict.get content.id model.cells of 
-                Nothing -> 
-                    { model | cells = Dict.insert newIndex (LayoutCell content newIndex model.labelFunc) model.cells }
                 Just c ->
                     model
 
-        deps = 
-            case Graph.get content.id model.graph of
+        deps =
+            case Graph.get content.id withContent.graph of
                 Nothing ->
                     []
+
                 Just ctx ->
-                    let outIds = ctx.outgoing 
-                        outCtxs = IntDict.map (\id x-> Graph.get id model.graph) outIds
-                    in List.map .node <| List.filterMap identity <| IntDict.values outCtxs
+                    List.map .node
+                        <| List.filterMap (\id -> Graph.get id withContent.graph) 
+                        <| IntDict.keys ctx.outgoing
     in
         List.foldl addContent withContent deps
 
 
-getNodes : Model a b -> List LayoutNode
-getNodes model =
-    model.cells
-        |> Dict.values
-        |> List.indexedMap createNode
-
-
-createNode : Int -> LayoutCell a -> LayoutNode
-createNode index cell =
-    let
-        x =
-            100 + ((toFloat index) * 80)
-
-        y =
-            30 + ((toFloat index) * 80)
-
-        label = cell.labelFunc cell.content
-    in
-        LayoutNode (vec2 x y) Color.red label
-
-
-
 getCells : Model a b -> List (LayoutCell a)
 getCells model =
-    model.cells
-        |> Dict.values
+    Dict.values <| model.cells
 
 
 getCell : Model a b -> Node a -> Maybe (LayoutCell a)
 getCell layout content =
-    layout.cells
-        |> Dict.values
-        |> List.filter (((==) content) << .content)
-        |> List.head
+    Dict.get content.id layout.cells
