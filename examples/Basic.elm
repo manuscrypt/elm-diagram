@@ -10,6 +10,7 @@ import Extra.Cmd exposing (noFx, updateOne, updateMany)
 import Diagram exposing (..)
 import Symbol exposing (..)
 
+
 type alias Model =
     { diagram : Diagram.Model
     }
@@ -20,10 +21,12 @@ type Msg
     | DiagramMsg Diagram.Msg
 
 
+(=>) : a -> b -> ( a, b )
 (=>) =
     (,)
 
 
+sample : List ( number, number' )
 sample =
     [ 70 => 50
     , 210 => 50
@@ -37,6 +40,7 @@ sample =
     ]
 
 
+sample2 : List ( number, number' )
 sample2 =
     [ 60 => 60
     , 220 => 300
@@ -45,16 +49,19 @@ sample2 =
     ]
 
 
+sampleCons : List (List number)
 sampleCons =
     [ [ 0, 1, 2, 3, 4, 5, 6, 7, 8 ]
     ]
 
 
+sampleCons4 : List (List number)
 sampleCons4 =
     [ [ 0, 1, 2, 8, 7, 6, 4, 3, 5 ]
     ]
 
 
+sampleCons2 : List (List number)
 sampleCons2 =
     [ [ 0, 3, 4, 6 ]
     , [ 1, 3, 5, 7 ]
@@ -62,6 +69,7 @@ sampleCons2 =
     ]
 
 
+sampleCons3 : List (List number)
 sampleCons3 =
     [ [ 0, 3, 5, 8 ]
     , [ 1, 3, 4, 6 ]
@@ -83,7 +91,7 @@ init =
         msgs' =
             List.map (\a -> DiagramMsg <| Connect a) sampleCons3
 
-        ( d, dx ) = 
+        ( d, dx ) =
             Diagram.init syms []
 
         m0 =
@@ -107,6 +115,7 @@ update msg model =
                     Diagram.update msg model.diagram
             in
                 ( { model | diagram = d }, Cmd.map DiagramMsg fx )
+
 
 diagram : Model -> Svg Msg
 diagram model =

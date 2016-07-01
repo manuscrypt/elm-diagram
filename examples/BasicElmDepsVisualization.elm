@@ -11,11 +11,13 @@ import Graph exposing (Graph, Node, Edge)
 import GraphListView
 import GraphToDiagram
 
+
 type alias Model a =
     { layout : Layout.Model a ()
     , diagram : Diagram.Model
     , graphView : GraphListView.Model a ()
     }
+
 
 type Msg
     = DiagramMsg Diagram.Msg
@@ -25,14 +27,17 @@ type Msg
 init : ( Graph a (), Node a -> String ) -> ( Model a, Cmd Msg )
 init ( graph, labelFunc ) =
     let
-        ( gv, gvx )   = GraphListView.init graph labelFunc
-        ( dg, layout) = GraphToDiagram.convert (graph, labelFunc)  
+        ( gv, gvx ) =
+            GraphListView.init graph labelFunc
 
+        ( dg, layout ) =
+            GraphToDiagram.convert ( graph, labelFunc ) { width = 600, height = 800 }
     in
         { layout = layout
         , diagram = dg
         , graphView = gv
-        } ! [ Cmd.map GraphViewMsg gvx ]
+        }
+            ! [ Cmd.map GraphViewMsg gvx ]
 
 
 update : Msg -> Model a -> ( Model a, Cmd Msg )
@@ -67,9 +72,9 @@ diagram model =
 view : Model a -> Svg Msg
 view model =
     Html.div [ bodyStyle ]
-        [ Html.div [ HA.style [(,) "display" "flex", (,) "flex-direction" "column"]]
-            [ Html.div[ HA.style [ (,) "flex" "auto" ] ] [ diagram model ]
-            , Html.div[ HA.style [ (,) "flex" "auto" ] ] [ App.map GraphViewMsg <| GraphListView.view model.graphView ]
+        [ Html.div [ HA.style [ (,) "display" "flex", (,) "flex-direction" "column" ] ]
+            [ Html.div [ HA.style [ (,) "flex" "auto" ] ] [ diagram model ]
+            , Html.div [ HA.style [ (,) "flex" "auto" ] ] [ App.map GraphViewMsg <| GraphListView.view model.graphView ]
             ]
         , Html.div
             [ HA.style

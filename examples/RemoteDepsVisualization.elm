@@ -6,30 +6,35 @@ import Html exposing (Html)
 import Html.App as App
 import Html.Attributes as HA
 import Svg exposing (Svg)
-import Http 
-import Task 
-import ElmFile exposing (ElmFile, decodeList) 
-import GraphListView 
+import Http
+import Task
+import IntDict
+import ElmFile exposing (ElmFile, decodeList)
+import GraphListView
 import Layout exposing (LayoutNode, LayoutCell)
 import Diagram
-import String
 import GraphToDiagram
-import Extra.Graph
-import IntDict
+import Window
+import Task.Extra as Task
 
-type alias Model 
-    = { layout : Layout.Model ElmFile ()
-      , graph : Graph ElmFile ()
-      , graphView: GraphListView.Model ElmFile () 
-      , diagram : Diagram.Model
-      , error: String
-      }
 
-type Msg 
+type alias Model =
+    { layout : Layout.Model ElmFile ()
+    , graph : Graph ElmFile ()
+    , graphView : GraphListView.Model ElmFile ()
+    , diagram : Diagram.Model
+    , message : String
+    , size : Window.Size
+    }
+
+
+type Msg
     = DataFetched (List ElmFile)
     | ErrorOccurred Http.Error
     | DiagramMsg Diagram.Msg
     | GraphViewMsg GraphListView.Msg
+    | SetWindowSize Window.Size
+
 
 main : Program Never
 main =
@@ -37,52 +42,80 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = (\_ -> Sub.none)
+        , subscriptions = (\model -> Sub.batch [ Window.resizes SetWindowSize ])
         }
 
-init: (Model, Cmd Msg)
-init = 
-    let (m, mx) = fromGraph Graph.empty
-    in m ! [fetchData, mx]  
+
+init : ( Model, Cmd Msg )
+init =
+    let
+        ( m, mx ) =
+            fromGraph Graph.empty { width = 0, height = 0 }
+    in
+        m ! [ mx, Window.size |> Task.performFailproof (\s -> SetWindowSize s), fetchData ]
+
 
 fetchData : Cmd Msg
 fetchData =
-    Task.perform ErrorOccurred DataFetched <|
-        Http.get decodeList "http://localhost:3001"
+    Task.perform ErrorOccurred DataFetched
+        <| Http.get decodeList "http://localhost:3001"
 
-fromGraph: Graph ElmFile () -> (Model, Cmd Msg)
-fromGraph graph = 
-    let labelFn = (\x -> x.label.name)
-        (newView, newViewFx) = GraphListView.init graph labelFn  
-        (dg, layout) = GraphToDiagram.convert (graph, labelFn)
-    in { graph = graph
-       , graphView = newView
-       , layout = layout
-       , diagram = dg
-       , error = "initialized" 
-       } ! [Cmd.map GraphViewMsg newViewFx]
 
-update: Msg -> Model -> (Model, Cmd Msg)
+fromGraph : Graph ElmFile () -> Window.Size -> ( Model, Cmd Msg )
+fromGraph graph size =
+    let
+        labelFn =
+            (\x -> x.label.name)
+
+        ( newView, newViewFx ) =
+            GraphListView.init graph labelFn
+
+        ( dg, layout ) =
+            GraphToDiagram.convert ( graph, labelFn ) size
+    in
+        { graph = graph
+        , graphView = newView
+        , layout = layout
+        , diagram = dg
+        , message = "initialized: " ++ (toString <| Graph.size graph)
+        , size = size
+        }
+            ! [ Cmd.map GraphViewMsg newViewFx ]
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of 
-        ErrorOccurred err -> 
-            { model | error = toString err } ! []
+    case msg of
+        SetWindowSize size ->
+            { model | size = size } ! []
+
+        ErrorOccurred err ->
+            { model | message = toString err } ! []
 
         DataFetched elmFiles ->
-            let newGraph = fromFiles elmFiles --<| List.filter (\e -> String.length e.moduleName > 0 ) elmFiles
+            --fromGraph (fromFiles elmFiles) model.size
+            let
+                newGraph =
+                    fromFiles elmFiles
+
+                --<| List.filter (\e -> String.length e.moduleName > 0 ) elmFiles
             in
-                let basicId = idFor "Basic.elm" elmFiles
-                    basicCtx = Graph.get basicId newGraph
-                    (bg, bgx) = case basicCtx of 
-                        Nothing ->
-                            fromGraph <| Graph.inducedSubgraph [basicId ] newGraph
-                        Just ctx ->
-                            fromGraph <| Graph.inducedSubgraph ([basicId]++(IntDict.keys ctx.incoming)) newGraph
-                in 
-                    if not(Extra.Graph.isAcyclic bg.graph) then
-                        Debug.crash "not acyclic"
-                    else  
-                        (bg, bgx)
+                let
+                    basicId =
+                        idFor "Basic.elm" elmFiles
+
+                    basicCtx =
+                        Graph.get basicId newGraph
+
+                    subGraph =
+                        case basicCtx of
+                            Nothing ->
+                                (Graph.inducedSubgraph [ basicId ] newGraph)
+
+                            Just ctx ->
+                                (Graph.inducedSubgraph ([ basicId ] ++ (IntDict.keys ctx.incoming)) newGraph)
+                in
+                    fromGraph subGraph model.size
 
         DiagramMsg msg ->
             let
@@ -98,18 +131,20 @@ update msg model =
             in
                 { model | graphView = gv } ! [ Cmd.map GraphViewMsg gvx ]
 
-idFor: String -> List ElmFile -> NodeId
-idFor str allFiles 
-    = List.filter (\e -> e.name == str ) allFiles |> List.head |> Maybe.map (\e -> e.id) |> Maybe.withDefault -1 
 
-view: Model -> Html Msg
+idFor : String -> List ElmFile -> NodeId
+idFor str allFiles =
+    List.filter (\e -> e.name == str) allFiles |> List.head |> Maybe.map (\e -> e.id) |> Maybe.withDefault -1
+
+
+view : Model -> Html Msg
 view model =
     Html.div [ bodyStyle ]
-        [ Html.div [] [ Html.text <| "Error " ++ toString model.error ]
-        , Html.div [ HA.style [(,) "display" "flex", (,) "flex-direction" "column"]]
-            [ Html.div[ HA.style [ (,) "flex" "auto" ] ] [ diagram model ]
-            , Html.div[ HA.style [ (,) "flex" "auto" ] ] [ App.map GraphViewMsg <| GraphListView.view model.graphView ]
-            , Html.div[ HA.style [ (,) "flex" "auto" ] ] [ Html.text <| Graph.toString' model.graph ]
+        [ Html.div [] [ Html.text <| "Message: " ++ toString model.message ]
+        , Html.div [ HA.style [ (,) "display" "flex", (,) "flex-direction" "column" ] ]
+            [ Html.div [ HA.style [ (,) "flex" "auto" ] ] [ diagram model ]
+            , Html.div [ HA.style [ (,) "flex" "auto" ] ] [ App.map GraphViewMsg <| GraphListView.view model.graphView ]
+            , Html.div [ HA.style [ (,) "flex" "auto" ] ] [ Html.text <| Graph.toString' model.graph ]
             ]
         , Html.div
             [ HA.style
@@ -135,8 +170,8 @@ diagram model =
 bodyStyle : Html.Attribute a
 bodyStyle =
     HA.style
-        [ (,) "width" "920px"
-        , (,) "margin" "auto"
-        , (,) "border" "1px solid black"
-        , (,) "background-color" "#EEEEEE"
+        [ -- (,) "width" "920px"
+          -- , (,) "margin" "auto"
+          -- , (,) "border" "1px solid black"
+          (,) "background-color" "#EEEEEE"
         ]

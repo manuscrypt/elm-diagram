@@ -9,7 +9,6 @@ import Process exposing (..)
 import Time exposing (..)
 import Task exposing (..)
 import Task.Extra as Task exposing (..)
-import Util exposing (..)
 import Date exposing (..)
 
 
@@ -82,10 +81,10 @@ update msg model =
             ( model, startCompilation )
 
         CompileSuccess _ ->
-            noFx { model | state = Successful }
+            { model | state = Successful } ! []
 
         CompileError str ->
-            noFx { model | state = Failed str }
+            { model | state = Failed str } ! []
 
 
 view : Compilate -> Html Msg

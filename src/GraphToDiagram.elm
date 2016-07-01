@@ -1,66 +1,78 @@
-
 module GraphToDiagram exposing (..)
 
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY, sub)
 import Diagram
 import Symbol
 import Dict
+import IntDict
 import Connection
 import Layout exposing (LayoutNode, LayoutCell)
 import Graph exposing (Graph, NodeId, Node, Edge)
-import Extra.Graph exposing (incCount, outCount)
-import KellyColors
+import Color
+import Window
 
-convert : ( Graph a b, Node a -> String ) -> (Diagram.Model, Layout.Model a b)
-convert ( graph, labelFunc ) =
+
+convert : ( Graph a b, Node a -> String ) -> Window.Size -> ( Diagram.Model, Layout.Model a b )
+convert ( graph, labelFunc ) size =
     let
         layout =
-            Layout.init graph labelFunc
+            Layout.init graph labelFunc size
 
         nodes =
-            List.indexedMap (createNode layout) <| Dict.values layout.cells
+            List.map (createNode size) <| Dict.toList layout.cells
 
         ( syms, symsFx ) =
             createSymbols nodes
 
-        conns = List.map (createConnection syms) (Graph.edges graph) 
+        conns =
+            List.map (createConnection syms) (Graph.edges graph)
 
         ( dg, dgFx ) =
             Diagram.init syms conns
     in
-        (dg, layout)
+        ( dg, layout )
 
-createNode : Layout.Model a b -> Int -> LayoutCell a -> LayoutNode
-createNode model index cell =
+
+createNode : Window.Size -> ( Int, LayoutCell a b ) -> LayoutNode
+createNode size ( index, cell ) =
     let
-        inc = (incCount cell.content model.graph)
-        out = (outCount cell.content model.graph)
-        diff = inc - out
-        x =
-            if( (%) index 2 == 0 ) then 
-                450 + ((toFloat index) * 60)
-            else 
-                450 - ((toFloat index) * 60)
+        inc =
+            IntDict.size cell.content.incoming
 
-        y = 
-            450 + (toFloat (out * 30) + (toFloat (inc * -30)))
+        out =
+            IntDict.size cell.content.outgoing
+
+        diff =
+            inc - out
+
+        spacing =
+            80
+
+        x =
+            spacing + (toFloat index * spacing)
+
+        y =
+            spacing + (toFloat index * spacing)
     in
-        LayoutNode cell.content.id (vec2 x y) (KellyColors.at index) (cell.labelFunc cell.content)
+        LayoutNode cell.content.node.id (vec2 x y) (Color.white) (cell.labelFunc cell.content.node)
 
 
 nodeToSymbol : Layout.LayoutNode -> ( Symbol.Model, Cmd Symbol.Msg )
 nodeToSymbol node =
     Symbol.init node.id node.label node.color (vec2 20 20) node.pos
 
+
 createSymbols : List Layout.LayoutNode -> ( List Symbol.Model, List (Cmd Symbol.Msg) )
 createSymbols nodes =
     List.unzip <| List.map nodeToSymbol nodes
+
 
 createConnections : List Symbol.Model -> List (Edge b) -> List Connection.Model
 createConnections syms edges =
     List.map (createConnection syms) edges
 
+
 createConnection : List Symbol.Model -> Edge b -> Connection.Model
 createConnection symbols { from, to } =
-    Connection.init 
-        <| List.filter (\s -> List.member s.id <| [from, to]) symbols
+    Connection.init
+        <| List.filter (\s -> List.member s.id <| [ from, to ]) symbols

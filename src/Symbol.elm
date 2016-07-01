@@ -7,9 +7,11 @@ import Extra.Cmd exposing (noFx)
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
 
+
 type Shape
     = Circle
     | Rect
+
 
 type alias Model =
     { id : Int
@@ -32,7 +34,8 @@ init : Int -> String -> Color -> Vec2 -> Vec2 -> ( Model, Cmd Msg )
 init id label color size pos =
     (Model id label Circle color size pos) ! []
 
-update : Msg -> Model -> ( Model, Cmd Msg ) 
+
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Move pos ->
@@ -51,14 +54,16 @@ update msg model =
 view : Model -> Svg Msg
 view model =
     let
-        label = Svg.text'
-                [ SA.x "0"
-                , SA.y "25"
+        label =
+            Svg.text'
+                [ SA.x "25"
+                , SA.y "0"
                 , SA.textAnchor "middle"
                 , SA.alignmentBaseline "middle"
                 , SA.style "font-weight:bold; font-size:15; font-family: Courier; fill: black;"
-                ] [ Svg.text model.label ]
-    in 
+                ]
+                [ Svg.text model.label ]
+    in
         Svg.g
             [ SA.transform <| translate model.pos
               --, SE.onMouseDown (Drag.start DragMsg Drag.OnDragStart)
@@ -68,7 +73,7 @@ view model =
             ]
 
 
-toSvg : Model-> Svg Msg
+toSvg : Model -> Svg Msg
 toSvg model =
     case model.shape of
         Circle ->
@@ -88,7 +93,7 @@ attrs list =
     List.map (\( k, v ) -> k v) list
 
 
-circle : Model-> List ( String -> Svg.Attribute b, String )
+circle : Model -> List ( String -> Svg.Attribute b, String )
 circle model =
     [ ( SA.cx, "0" )
     , ( SA.cy, "0" )
@@ -98,7 +103,7 @@ circle model =
     ]
 
 
-rect : Model-> List ( String -> Svg.Attribute b, String )
+rect : Model -> List ( String -> Svg.Attribute b, String )
 rect model =
     [ ( SA.x, "0" )
     , ( SA.y, "0" )

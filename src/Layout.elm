@@ -3,9 +3,8 @@ module Layout exposing (..)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY, sub)
 import Color exposing (Color)
 import Dict exposing (Dict)
-import IntDict
 import Graph exposing (Graph, Node, NodeContext)
---import Extra.Graph exposing (noIncoming, incCount, outCount)
+import Window
 
 
 type alias LayoutNode =
@@ -16,56 +15,41 @@ type alias LayoutNode =
     }
 
 
-type alias LayoutCell a =
-    { content : Node a
+type alias LayoutCell a b =
+    { content : NodeContext a b
     , labelFunc : Node a -> String
     }
 
 
 type alias Model a b =
     { graph : Graph a b
-    , cells : Dict Int (LayoutCell a)
+    , cells : Dict Int (LayoutCell a b)
     , labelFunc : Node a -> String
+    , size : Window.Size
     }
 
 
-init : Graph a b -> (Node a -> String) -> Model a b
-init g labelFunc =
-    List.foldl addContent ({ graph = g, cells = Dict.empty, labelFunc = labelFunc })
-        <| Graph.nodes g
-        --<| List.map .node
---        <| noIncoming g
-
-
-addContent : Node a -> Model a b -> Model a b
-addContent content model =
+init : Graph a b -> (Node a -> String) -> Window.Size -> Model a b
+init g labelFunc size =
     let
-        withContent =
-            case Dict.get content.id model.cells of
-                Nothing ->
-                    { model | cells = Dict.insert content.id (LayoutCell content model.labelFunc) model.cells }
+        sorted =
+            Graph.topologicalSort g
 
-                Just c ->
-                    model
-
-        deps =
-            case Graph.get content.id withContent.graph of
-                Nothing ->
-                    []
-
-                Just ctx ->
-                    List.map .node
-                        <| List.filterMap (\id -> Graph.get id withContent.graph) 
-                        <| IntDict.keys ctx.outgoing
+        cells =
+            Dict.fromList <| List.indexedMap (\i ctx -> ( i, LayoutCell ctx labelFunc )) <| sorted
     in
-        List.foldl addContent withContent deps
+        { graph = g
+        , cells = cells
+        , labelFunc = labelFunc
+        , size = size
+        }
 
 
-getCells : Model a b -> List (LayoutCell a)
+getCells : Model a b -> List (LayoutCell a b)
 getCells model =
     Dict.values <| model.cells
 
 
-getCell : Model a b -> Node a -> Maybe (LayoutCell a)
+getCell : Model a b -> Node a -> Maybe (LayoutCell a b)
 getCell layout content =
     Dict.get content.id layout.cells
