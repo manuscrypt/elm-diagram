@@ -93,30 +93,45 @@ update msg model =
             { model | message = toString err } ! []
 
         DataFetched elmFiles ->
-            --fromGraph (fromFiles elmFiles) model.size
+            --        fromGraph (fromFiles elmFiles) model.size
             let
-                newGraph =
+                g =
                     fromFiles elmFiles
-
-                --<| List.filter (\e -> String.length e.moduleName > 0 ) elmFiles
             in
-                let
-                    basicId =
-                        idFor "Basic.elm" elmFiles
+                case Graph.get (idFor "Basic.elm" elmFiles) g of
+                    Nothing ->
+                        Debug.crash "no Basic.elm found"
 
-                    basicCtx =
-                        Graph.get basicId newGraph
+                    Just ctx ->
+                        let
+                            induced =
+                                Debug.log "oh"
+                                    <| Graph.inducedSubgraph ([ ctx.node.id ] ++ (IntDict.keys ctx.outgoing)) g
+                        in
+                            fromGraph induced model.size
 
-                    subGraph =
-                        case basicCtx of
-                            Nothing ->
-                                (Graph.inducedSubgraph [ basicId ] newGraph)
-
-                            Just ctx ->
-                                (Graph.inducedSubgraph ([ basicId ] ++ (IntDict.keys ctx.outgoing)) newGraph)
-                in
-                    fromGraph subGraph model.size
-
+        -- let
+        --     newGraph =
+        --         fromFiles elmFiles
+        --
+        --     --<| List.filter (\e -> String.length e.moduleName > 0 ) elmFiles
+        -- in
+        --     let
+        --         basicId =
+        --             idFor "Basic.elm" elmFiles
+        --
+        --         basicCtx =
+        --             Graph.get basicId newGraph
+        --
+        --         subGraph =
+        --             case basicCtx of
+        --                 Nothing ->
+        --                     (Graph.inducedSubgraph [ basicId ] newGraph)
+        --
+        --                 Just ctx ->
+        --                     (Graph.inducedSubgraph ([ basicId ] ++ (IntDict.keys ctx.outgoing)) newGraph)
+        --     in
+        --         fromGraph subGraph model.size
         DiagramMsg msg ->
             let
                 ( d, fx ) =

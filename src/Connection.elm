@@ -17,7 +17,7 @@ type alias Model =
 
 blackStroke : Stroke
 blackStroke =
-    Stroke Color.black 2
+    Stroke Color.brown 1
 
 
 init : List Symbol.Model -> Model

@@ -19,7 +19,7 @@ convert ( graph, labelFunc ) size =
             Layout.init graph labelFunc size
 
         nodes =
-            List.map (createNode size) <| Dict.toList layout.cells
+            List.map (createNode size <| Graph.size graph) <| Dict.toList layout.cells
 
         ( syms, symsFx ) =
             createSymbols nodes
@@ -33,8 +33,8 @@ convert ( graph, labelFunc ) size =
         ( dg, layout )
 
 
-createNode : Window.Size -> ( Int, LayoutCell a b ) -> LayoutNode
-createNode size ( index, cell ) =
+createNode : Window.Size -> Int -> ( Int, LayoutCell a b ) -> LayoutNode
+createNode size count ( index, cell ) =
     let
         inc =
             IntDict.size cell.content.incoming
@@ -42,23 +42,23 @@ createNode size ( index, cell ) =
         out =
             IntDict.size cell.content.outgoing
 
-        diff =
-            inc - out
+        slice =
+            degrees (360 / (toFloat count))
 
-        spacing =
-            80
-
-        sgn =
-            if ((%) index 2) == 0 then
-                -1
-            else
-                1
+        ( hw, hh ) =
+            ( 0.9 * toFloat size.width / 2, 0.9 * toFloat size.height / 2 )
 
         x =
-            450 + sgn * (spacing + (toFloat ((%) index 3) * spacing / 2))
+            1.1
+                * hw
+                - hw
+                * sin (toFloat index * slice)
 
         y =
-            spacing + (toFloat index * spacing)
+            1.1
+                * hh
+                - hh
+                * cos (toFloat index * slice)
     in
         LayoutNode cell.content.node.id (vec2 x y) (Color.white) (cell.labelFunc cell.content.node)
 
