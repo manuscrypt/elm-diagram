@@ -10,6 +10,7 @@ import Html.App as Html
 import Time exposing (Time, second)
 import Color exposing ( Color )
 import DynamicLayout
+import SvgVisualization
 import String
 
 --  SAMPLE
@@ -185,42 +186,19 @@ viewSvgGrid model =
   in ( drawLinesX ( toFloat <| round ( minX - stepSize ) ) stepSize maxX minY maxY )
   ++ ( drawLinesY ( toFloat <| round ( minY - stepSize ) ) stepSize maxY minX maxX )
 
-viewSvgConnection : SampleNode -> SampleNode -> Model -> List ( VirtualDom.Node a ) 
-viewSvgConnection nodeA nodeB model =
-  let posA = DynamicLayout.positionOfNode nodeA model.layout
-      posB = DynamicLayout.positionOfNode nodeB model.layout
-  in
-      [ (bezierLineWithDirection (Math.Vector2.add posA (vec2 0 20))
-        (vec2 0 40)
-        (vec2 0 -60)
-        (Math.Vector2.add posB (vec2 0 -20))
-        ( Stroke Color.brown 1 )
-      )
-    , (arrow (Math.Vector2.add posB (vec2 0 -20))
-        (vec2 0 -1)
-        ( Stroke Color.brown 1 )
-        Color.red
-      )
-    ]
-
-
 viewSvgNodes : Model -> List ( VirtualDom.Node a )
-viewSvgNodes model =
-  ( viewSvgGrid model ) 
-  ++ ( List.concat <| ( ( List.map ( \( nodeA, nodeB ) -> viewSvgConnection nodeA nodeB model ) sampleConnections ) ) )
-  ++ 
-  (
-  List.concat <| List.map ( \node ->
-    let pos = DynamicLayout.positionOfNode node model.layout
-    in [ SvgUtils.circle pos 20 ( Stroke Color.black 2 ) Color.lightBlue
-       , Svg.text' [ SA.x ( toString ( getX pos ) )
-                   , SA.y ( toString ( getY pos ) )
-                   , SA.textAnchor "middle"
-                   , SA.alignmentBaseline "middle"
-                   , SA.style "font-weight:bold; font-size:15; font-family: Courier; fill: black;"
-                   ] [ Svg.text node.name ] 
-             ]  
-           ) model.nodes  )
+viewSvgNodes model = 
+  ( SvgVisualization.grid ( DynamicLayout.viewbox viewboxMargin model.layout ) )
+  ++ ( List.concat <| List.map ( \( nodeA, nodeB ) -> 
+        SvgVisualization.connection 
+          ( DynamicLayout.positionOfNode nodeA model.layout )
+          ( DynamicLayout.positionOfNode nodeB model.layout )
+        ) sampleConnections )  
+  ++ ( List.concat <| List.map ( \node -> 
+         SvgVisualization.node 
+          ( DynamicLayout.positionOfNode node model.layout ) 
+          node.name 
+       ) model.nodes  )
            
 view : Model -> Html Msg
 view model =
