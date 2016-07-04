@@ -1,17 +1,13 @@
-module DynamicLayoutSample exposing (..)
+module DynamicLayoutSample1 exposing (..)
 
 import VirtualDom exposing (Node)
 import Svg exposing (..)
 import Svg.Attributes as SA exposing (..)
-import Extra.Svg as SvgUtils exposing (Stroke,bezierLineWithDirection,arrow)
-import Math.Vector2 exposing (Vec2, vec2, getX, getY, add, sub, direction )
 import Html exposing (Html)
 import Html.App as Html
 import Time exposing (Time, second)
-import Color exposing ( Color )
 import DynamicLayout
 import SvgVisualization
-import String
 
 --  SAMPLE
 
@@ -43,7 +39,7 @@ sampleNodes =
   ++ List.map ( \nr -> { name = "x" ++ ( toString nr ) } ) [10..15]
 
 sampleConnections = 
-  [ ( sampleNode0, sampleNode3 )
+  [ ( sampleNode0, sampleNode3 ) 
   , ( sampleNode1, sampleNode3 )
   , ( sampleNode2, sampleNode5 )
   , ( sampleNode3, sampleNode4 )
@@ -116,7 +112,7 @@ init = ( { nodes = sampleNodes
 addNode node model =
   { model
   | nodes = model.nodes ++ [ node ]
-  , layout = DynamicLayout.addNode node model.layout 
+  , layout = DynamicLayout.addNode node model.layout
   }
 
 sample : (Model, Cmd Msg)
@@ -157,35 +153,6 @@ subscriptions model =
 
 viewboxMargin = 50 
 
-calcStepSize : Float -> Float -> Float
-calcStepSize min max = 
-  let d = ( max - min )
-  in if( d < 10 ) then 1
-  else if( d < 100 ) then 10
-  else  100
-
-drawLinesX : Float -> Float -> Float -> Float -> Float -> List ( VirtualDom.Node a )
-drawLinesX x stepSize maxX minY maxY =
-  [ SvgUtils.bezierLineWithDirection (vec2 x minY ) (vec2 -1 1) (vec2 1 -1) (vec2 x maxY ) ( Stroke Color.blue 0.3 )
-  ] ++ if( x + stepSize < maxX )then 
-    ( drawLinesX ( x + stepSize ) stepSize maxX minY maxY )
-    else []
-
-drawLinesY : Float -> Float -> Float -> Float -> Float -> List ( VirtualDom.Node a )
-drawLinesY y stepSize maxY minX maxX =
-  [ SvgUtils.bezierLineWithDirection (vec2 minX y ) (vec2 0 0) (vec2 0 0) (vec2 maxX y ) ( Stroke Color.blue 0.3 )
-  ] ++ if( y + stepSize < maxY )then 
-    ( drawLinesY ( y + stepSize ) stepSize maxY minX maxX )
-    else []
-
-
-viewSvgGrid : Model -> List ( VirtualDom.Node a )
-viewSvgGrid model =
-  let ( minX, minY, maxX, maxY ) = DynamicLayout.viewbox viewboxMargin model.layout
-      stepSize = calcStepSize minY maxY
-  in ( drawLinesX ( toFloat <| round ( minX - stepSize ) ) stepSize maxX minY maxY )
-  ++ ( drawLinesY ( toFloat <| round ( minY - stepSize ) ) stepSize maxY minX maxX )
-
 viewSvgNodes : Model -> List ( VirtualDom.Node a )
 viewSvgNodes model = 
   ( SvgVisualization.grid ( DynamicLayout.viewbox viewboxMargin model.layout ) )
@@ -208,7 +175,9 @@ view model =
           , x "0", y "0",  SA.width "600", SA.height "500"
           , viewBox ( DynamicLayout.viewboxAsString viewboxMargin model.layout ) 
           ]
-          ( viewSvgNodes model )  
+          ( 
+             ( viewSvgNodes model )           
+             )  
       , text ( ( toString model.actTime ) ++ "-" ++ ( toString model.startTime ) ++ "=" ++ ( toString model.secsSinseStart ) )
       ]
 

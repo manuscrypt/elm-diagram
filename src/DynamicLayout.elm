@@ -101,7 +101,7 @@ positionOfNode : nodeType -> Model nodeType -> Vec2
 positionOfNode node model = 
   case List.filter ( \( n, p ) -> n == node ) model.positions of
   [ ( n, p ) ] -> p
-  _ -> Debug.log "DynamicLayout.posOfNode node not found" ( vec2 0 0 )
+  _ -> let d = Debug.log "DynamicLayout.posOfNode node not found" node in ( vec2 0 0 )
 
 addForEachRule : Rule nodeType -> Model nodeType -> Model nodeType
 addForEachRule rule model = 
