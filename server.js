@@ -5,9 +5,6 @@ var readdirp = require('readdirp')
   , fs = require('fs')
   , readline = require('readline');
 
-//const idRegex = /\b(?:\S+?\.)+\S+\b/g
-const moduleRegex = /^module\s+([\w*|\.]*)\b/g
-const importRegex = /^import\s+([\w*|\.]*)\b/g
 
 http.createServer(function (req, res) {
 
@@ -25,6 +22,11 @@ http.createServer(function (req, res) {
             input: fs.createReadStream(entry.fullPath),
             terminal: false
         }).on('line', function(line) {
+            // diese variablen ausserhalb erkennt nicht alle imports
+            //const idRegex = /\b(?:\S+?\.)+\S+\b/g
+            const moduleRegex = /^module\s+([\w*|\.]*)\b/g
+            const importRegex = /^import\s+([\w*|\.]*)\b/g
+
             var moduleMatch = moduleRegex.exec(line);
             if( moduleMatch ){
                 summ.moduleName = moduleMatch[1];
