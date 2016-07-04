@@ -50,6 +50,11 @@ addNode node model =
   , layout = DynamicLayout.addNodeAtPosition node ( vec2 ( toFloat ( List.length model.nodes ) * 10 ) 0 ) model.layout 
   }
 
+containsNode : Node -> Model -> Bool
+containsNode node model 
+  = if( 0 == ( List.length ( List.filter ( \n -> n == node ) model.nodes ) ) )
+  then False else True 
+
 addImport : Node -> Node -> Model -> Model
 addImport parent child model = 
   { model
