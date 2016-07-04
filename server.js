@@ -36,7 +36,9 @@ http.createServer(function (req, res) {
                 summ.imports.push( importMatch[1] );
             }
         }).on('close', function(){
-            files.push(summ);
+            if( summ.moduleName !== "" ){
+              files.push(summ);
+            }
         });
     }).on( 'end', function() {
         res.end( JSON.stringify(files));

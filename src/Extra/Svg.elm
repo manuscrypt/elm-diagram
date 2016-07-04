@@ -168,6 +168,11 @@ path st p1 ( cp1, x ) ( cp2, y ) p2 _ =
         Svg.path [ SA.style st, SA.d path ] []
 
 
+toPath : String -> String -> Svg a
+toPath style path =
+    Svg.path [ SA.style style, SA.d path ] []
+
+
 translate : Vec2 -> String
 translate pos =
     "translate (" ++ (toString <| getX pos) ++ "," ++ (toString <| getY pos) ++ ")"
