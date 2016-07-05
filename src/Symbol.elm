@@ -56,11 +56,11 @@ view model =
     let
         label =
             Svg.text'
-                [ SA.x "25"
+                [ SA.x "0"
                 , SA.y "0"
                 , SA.textAnchor "middle"
                 , SA.alignmentBaseline "middle"
-                , SA.style "font-weight:bold; font-size:15; font-family: Courier; fill: black;"
+                , SA.style "font-weight:bold; font-size:10px; font-family: Verdana; fill: black; z-index: 1000"
                 ]
                 [ Svg.text model.label ]
     in
@@ -100,6 +100,7 @@ circle model =
     , ( SA.r, toString <| getX model.size )
     , ( SA.fill, colorToHex model.color )
     , ( SA.stroke, "black" )
+    , ( SA.z, "-100" )
     ]
 
 
@@ -111,6 +112,7 @@ rect model =
     , ( SA.height, toString <| getY model.size )
     , ( SA.fill, colorToHex model.color )
     , ( SA.stroke, "black" )
+    , ( SA.z, "-100" )
     ]
 
 

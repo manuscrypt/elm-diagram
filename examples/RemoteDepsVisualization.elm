@@ -8,21 +8,15 @@ import Html.Attributes as HA
 import Svg exposing (Svg)
 import Http
 import Task
-import IntDict
+import Dict exposing (Dict)
 import ElmFile exposing (ElmFile, decodeList)
-import GraphListView
-import Layout exposing (LayoutNode, LayoutCell)
-import Diagram
-import GraphToDiagram
 import Window
 import Task.Extra as Task
+import Visualization
 
 
 type alias Model =
-    { layout : Layout.Model ElmFile ()
-    , graph : Graph ElmFile ()
-    , graphView : GraphListView.Model ElmFile ()
-    , diagram : Diagram.Model
+    { visualizations : Dict Int (Visualization.Model ElmFile ())
     , message : String
     , size : Window.Size
     }
@@ -31,8 +25,7 @@ type alias Model =
 type Msg
     = DataFetched (List ElmFile)
     | ErrorOccurred Http.Error
-    | DiagramMsg Diagram.Msg
-    | GraphViewMsg GraphListView.Msg
+    | VisualizationMsg Int Visualization.Msg
     | SetWindowSize Window.Size
 
 
@@ -49,10 +42,10 @@ main =
 init : ( Model, Cmd Msg )
 init =
     let
-        ( m, mx ) =
-            fromGraph Graph.empty { width = 0, height = 0 }
+        m0 =
+            { visualizations = Dict.empty, message = "initializing...", size = { width = 0, height = 0 } }
     in
-        m ! [ mx, Window.size |> Task.performFailproof (\s -> SetWindowSize s), fetchData ]
+        m0 ! [ Window.size |> Task.performFailproof (\s -> SetWindowSize s), fetchData ]
 
 
 fetchData : Cmd Msg
@@ -61,26 +54,29 @@ fetchData =
         <| Http.get decodeList "http://localhost:3001"
 
 
-fromGraph : Graph ElmFile () -> Window.Size -> ( Model, Cmd Msg )
-fromGraph graph size =
+fromGraphs : List (Graph ElmFile ()) -> Model -> ( Model, Cmd Msg )
+fromGraphs graphs model =
     let
+        count =
+            floor (sqrt (toFloat <| List.length graphs))
+
         labelFn =
             (\x -> x.label.name)
 
-        ( newView, newViewFx ) =
-            GraphListView.init graph labelFn
+        size' =
+            { width = model.size.width // count, height = model.size.height // count }
 
-        ( dg, layout ) =
-            GraphToDiagram.convert ( graph, labelFn ) size
+        ( vis, visfxs ) =
+            List.unzip <| List.map (\g -> Visualization.init g size' labelFn) graphs
+
+        newViss =
+            Dict.fromList <| List.indexedMap (,) vis
     in
-        { graph = graph
-        , graphView = newView
-        , layout = layout
-        , diagram = dg
-        , message = "initialized: " ++ (toString <| Graph.size graph)
-        , size = size
+        { model
+            | visualizations = newViss
+            , message = "initialized with " ++ (toString <| List.length graphs) ++ " graphs"
         }
-            ! [ Cmd.map GraphViewMsg newViewFx ]
+            ! (List.map2 (\( i, v ) eff -> Cmd.map (VisualizationMsg i) eff) (Dict.toList newViss) visfxs)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -93,58 +89,37 @@ update msg model =
             { model | message = toString err } ! []
 
         DataFetched elmFiles ->
-            --        fromGraph (fromFiles elmFiles) model.size
-            let
-                g =
-                    fromFiles elmFiles
-            in
-                case Graph.get (idFor "Basic.elm" elmFiles) g of
-                    Nothing ->
-                        Debug.crash "no Basic.elm found"
-
-                    Just ctx ->
-                        let
-                            induced =
-                                Debug.log "oh"
-                                    <| Graph.inducedSubgraph ([ ctx.node.id ] ++ (IntDict.keys ctx.outgoing)) g
-                        in
-                            fromGraph induced model.size
+            fromGraphs (Graph.stronglyConnectedComponents <| fromFiles elmFiles) model
 
         -- let
-        --     newGraph =
+        --     g =
         --         fromFiles elmFiles
-        --
-        --     --<| List.filter (\e -> String.length e.moduleName > 0 ) elmFiles
         -- in
-        --     let
-        --         basicId =
-        --             idFor "Basic.elm" elmFiles
+        --     case Graph.get (idFor "Basic.elm" elmFiles) g of
+        --         Nothing ->
+        --             Debug.crash "no Basic.elm found"
         --
-        --         basicCtx =
-        --             Graph.get basicId newGraph
-        --
-        --         subGraph =
-        --             case basicCtx of
-        --                 Nothing ->
-        --                     (Graph.inducedSubgraph [ basicId ] newGraph)
-        --
-        --                 Just ctx ->
-        --                     (Graph.inducedSubgraph ([ basicId ] ++ (IntDict.keys ctx.outgoing)) newGraph)
-        --     in
-        --         fromGraph subGraph model.size
-        DiagramMsg msg ->
-            let
-                ( d, fx ) =
-                    Diagram.update msg model.diagram
-            in
-                ( { model | diagram = d }, Cmd.map DiagramMsg fx )
+        --         Just ctx ->
+        --             let
+        --                 induced =
+        --                     Debug.log "oh"
+        --                         <| Graph.inducedSubgraph ([ ctx.node.id ] ++ (IntDict.keys ctx.outgoing)) g
+        --             in
+        --                 fromGraph induced model.size
+        VisualizationMsg id msg ->
+            case Dict.get id model.visualizations of
+                Nothing ->
+                    model ! []
 
-        GraphViewMsg msg ->
-            let
-                ( gv, gvx ) =
-                    GraphListView.update msg model.graphView
-            in
-                { model | graphView = gv } ! [ Cmd.map GraphViewMsg gvx ]
+                Just vis ->
+                    let
+                        ( vis', eff ) =
+                            Visualization.update msg vis
+
+                        updated =
+                            Dict.update id (\mbVis -> Just vis') model.visualizations
+                    in
+                        ( { model | visualizations = updated }, Cmd.map (VisualizationMsg id) eff )
 
 
 idFor : String -> List ElmFile -> NodeId
@@ -157,9 +132,7 @@ view model =
     Html.div [ bodyStyle ]
         [ Html.div [] [ Html.text <| "Message: " ++ toString model.message ]
         , Html.div [ HA.style [ (,) "display" "flex", (,) "flex-direction" "column" ] ]
-            [ Html.div [ HA.style [ (,) "flex" "auto" ] ] [ diagram model ]
-            , Html.div [ HA.style [ (,) "flex" "auto" ] ] [ App.map GraphViewMsg <| GraphListView.view model.graphView ]
-            , Html.div [ HA.style [ (,) "flex" "auto" ] ] [ Html.text <| Graph.toString' model.graph ]
+            [ Html.div [ HA.style [ (,) "flex" "auto" ] ] (Dict.values <| Dict.map viewVis model.visualizations)
             ]
         , Html.div
             [ HA.style
@@ -171,15 +144,9 @@ view model =
         ]
 
 
-diagram : Model -> Svg Msg
-diagram model =
-    Html.div
-        [ HA.style
-            [ (,) "z-index" "1"
-            , (,) "opacity" "1"
-            ]
-        ]
-        [ App.map DiagramMsg <| Diagram.view model.diagram ]
+viewVis : Int -> Visualization.Model ElmFile () -> Svg Msg
+viewVis id vis =
+    App.map (VisualizationMsg id) (Visualization.view vis)
 
 
 bodyStyle : Html.Attribute a

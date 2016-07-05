@@ -46,19 +46,32 @@ createNode size count ( index, cell ) =
             degrees (360 / (toFloat count))
 
         ( hw, hh ) =
-            ( 0.9 * toFloat size.width / 2, 0.9 * toFloat size.height / 2 )
+            ( toFloat size.width, toFloat size.height )
+
+        mx =
+            Basics.max hw hh
+
+        ( fw, fh ) =
+            --( mx, mx )
+            ( hw, hh )
 
         x =
-            1.1
-                * hw
-                - hw
-                * sin (toFloat index * slice)
+            35
+                + 1
+                * fw
+                / 2
+                - fw
+                / 2
+                * cos (toFloat index * slice)
 
         y =
-            1.1
-                * hh
-                - hh
-                * cos (toFloat index * slice)
+            35
+                + 1
+                * fh
+                / 2
+                - fh
+                / 2
+                * sin (toFloat index * slice)
     in
         LayoutNode cell.content.node.id (vec2 x y) (Color.white) (cell.labelFunc cell.content.node)
 

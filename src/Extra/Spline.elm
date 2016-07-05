@@ -1,4 +1,4 @@
-module Spline exposing (..)
+module Extra.Spline exposing (..)
 
 import List
 import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY, add, scale, sub, negate)
@@ -9,6 +9,42 @@ import Extra.Array exposing (..)
 
 type alias VecN =
     Array Float
+
+
+splines : List Vec2 -> List String
+splines points =
+    let
+        xs =
+            getXs points
+
+        ys =
+            getYs points
+
+        px =
+            computeControlPoints xs
+
+        py =
+            computeControlPoints ys
+    in
+        List.map (toPath xs ys px py) [0..(List.length points - 2)]
+
+
+toPath : VecN -> VecN -> { p1 : VecN, p2 : VecN } -> { p1 : VecN, p2 : VecN } -> Int -> String
+toPath xs ys px py idx =
+    let
+        from =
+            vec2 (getAt idx xs) (getAt idx ys)
+
+        p1' =
+            vec2 (getAt idx px.p1) (getAt idx py.p1)
+
+        p2' =
+            vec2 (getAt idx px.p2) (getAt idx py.p2)
+
+        to =
+            vec2 (getAt (idx + 1) xs) (getAt (idx + 1) ys)
+    in
+        "M " ++ sp from ++ " C " ++ sp p1' ++ " " ++ sp p2' ++ " " ++ sp to
 
 
 getXs : List Vec2 -> VecN
@@ -118,39 +154,3 @@ solve a b c r =
                 setAt (n - 1) ((getAt (n - 1) r'') / (getAt (n - 1) b'')) p
         in
             List.foldl (\i p'' -> setAt i ((getAt i r'' - (getAt i c) * (getAt (i + 1) p'')) / (getAt i b'')) p'') p' (List.reverse [0..(n - 2)])
-
-
-splines : List Vec2 -> List String
-splines points =
-    let
-        xs =
-            getXs points
-
-        ys =
-            getYs points
-
-        px =
-            computeControlPoints xs
-
-        py =
-            computeControlPoints ys
-    in
-        List.map (toPath xs ys px py) [0..(List.length points - 2)]
-
-
-toPath : VecN -> VecN -> { p1 : VecN, p2 : VecN } -> { p1 : VecN, p2 : VecN } -> Int -> String
-toPath xs ys px py idx =
-    let
-        from =
-            vec2 (getAt idx xs) (getAt idx ys)
-
-        p1' =
-            vec2 (getAt idx px.p1) (getAt idx py.p1)
-
-        p2' =
-            vec2 (getAt idx px.p2) (getAt idx py.p2)
-
-        to =
-            vec2 (getAt (idx + 1) xs) (getAt (idx + 1) ys)
-    in
-        "M " ++ sp from ++ " C " ++ sp p1' ++ " " ++ sp p2' ++ " " ++ sp to
