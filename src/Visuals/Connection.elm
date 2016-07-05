@@ -1,12 +1,12 @@
-module Connection exposing (..)
+module Visuals.Connection exposing (..)
 
 import Svg exposing (Svg)
-import VirtualDom exposing (Node)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
 import Color exposing (Color)
 import Extra.Svg exposing (Stroke, bezierLineWithDirection, arrow)
 import Extra.Spline
-import Symbol
+import Visuals.Symbol as Symbol
+import VirtualDom
 
 
 type alias Model =

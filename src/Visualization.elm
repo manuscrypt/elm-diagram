@@ -1,15 +1,15 @@
 module Visualization exposing (..)
 
-import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
+import Window
 import Html exposing (Html)
 import Html.App as App
 import Html.Attributes as HA
 import Svg exposing (Svg)
-import GraphListView
-import Layout exposing (LayoutNode, LayoutCell)
-import Diagram
+import Layout.Layout as Layout exposing (LayoutNode, LayoutCell)
+import Visuals.GraphListView as GraphListView
+import Visuals.Diagram as Diagram
 import GraphToDiagram
-import Window
+import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
 
 
 type alias Model a b =
@@ -93,6 +93,7 @@ diagram model =
         [ HA.style
             [ (,) "z-index" "1"
             , (,) "opacity" "1"
+            , (,) "border" "1px solid violet"
             ]
         ]
         [ App.map DiagramMsg <| Diagram.view model.diagram ]
@@ -103,6 +104,6 @@ bodyStyle =
     HA.style
         [ -- (,) "width" "920px"
           -- , (,) "margin" "auto"
-          -- , (,) "border" "1px solid black"
           (,) "background-color" "#EEEEEE"
+        , (,) "padding" "10px"
         ]

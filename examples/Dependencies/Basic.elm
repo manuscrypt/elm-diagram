@@ -1,8 +1,8 @@
-module Basic exposing (..)
+module Dependencies.Basic exposing (..)
 
-import Graph exposing (Graph, Node, NodeContext, NodeId, Edge, Adjacency)
 import Html.App as App
-import Visuals.GraphListView exposing (init, view, update)
+import Visualization exposing (init, view, update)
+import Graph exposing (Graph)
 
 
 sample : ( Graph String (), { b | label : a } -> a )
@@ -20,7 +20,7 @@ main =
             sample
     in
         App.program
-            { init = init g fn
+            { init = init g { width = 500, height = 500 } fn
             , view = view
             , update = update
             , subscriptions = (\_ -> Sub.none)

@@ -1,4 +1,4 @@
-module ElmFile exposing (ElmFile, decodeList)
+module Model.ElmFile exposing (ElmFile, decodeList)
 
 import Json.Encode
 import Json.Decode exposing ((:=))

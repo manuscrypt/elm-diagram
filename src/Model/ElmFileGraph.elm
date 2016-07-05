@@ -1,8 +1,8 @@
-module ElmFileGraph exposing (..)
+module Model.ElmFileGraph exposing (..)
 
 import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
 import String
-import ElmFile exposing (ElmFile, decodeList)
+import Model.ElmFile exposing (ElmFile, decodeList)
 
 
 type alias ElmFileGraph =
