@@ -1,9 +1,8 @@
-module Symbol exposing (..)
+module Visuals.Symbol exposing (..)
 
 import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY)
 import Svg exposing (Svg)
 import Svg.Attributes as SA
-import Extra.Cmd exposing (noFx)
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
 
@@ -39,16 +38,16 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Move pos ->
-            noFx { model | pos = pos }
+            { model | pos = pos } ! []
 
         SetColor clr ->
-            noFx { model | color = clr }
+            { model | color = clr } ! []
 
         Resize size ->
-            noFx { model | size = size }
+            { model | size = size } ! []
 
         NoOp ->
-            noFx model
+            model ! []
 
 
 view : Model -> Svg Msg

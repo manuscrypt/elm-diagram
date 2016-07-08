@@ -1,10 +1,10 @@
-module Diagram exposing (..)
+module Visuals.Diagram exposing (..)
 
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
 import Html.App as App
 import Dict exposing (insert)
-import Symbol
-import Connection
+import Visuals.Symbol as Symbol
+import Visuals.Connection as Connection
 import Svg exposing (Svg)
 import Svg.Attributes as SA
 import Extra.Cmd exposing (noFx)
@@ -25,9 +25,9 @@ type Msg
     | NoOp
 
 
-init : List Symbol.Model -> List Connection.Model -> ( Model, Cmd Msg )
-init syms conns =
-    { size = vec2 2800 2200
+init : Vec2 -> List Symbol.Model -> List Connection.Model -> ( Model, Cmd Msg )
+init size syms conns =
+    { size = vec2 (getX size) (getY size)
     , gridSize = vec2 10 10
     , symbols = Dict.fromList <| List.map (\r -> ( r.id, r )) syms
     , connections = conns

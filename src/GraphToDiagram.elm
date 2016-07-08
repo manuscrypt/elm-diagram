@@ -1,15 +1,15 @@
 module GraphToDiagram exposing (..)
 
-import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY, sub)
-import Diagram
-import Symbol
+import Window
+import Color
 import Dict
 import IntDict
-import Connection
-import Layout exposing (LayoutNode, LayoutCell)
+import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY, sub)
 import Graph exposing (Graph, NodeId, Node, Edge)
-import Color
-import Window
+import Visuals.Diagram as Diagram
+import Visuals.Symbol as Symbol
+import Visuals.Connection as Connection
+import Layout.Layout as Layout exposing (LayoutNode, LayoutCell)
 
 
 convert : ( Graph a b, Node a -> String ) -> Window.Size -> ( Diagram.Model, Layout.Model a b )
@@ -28,7 +28,7 @@ convert ( graph, labelFunc ) size =
             List.map (createConnection syms) (Graph.edges graph)
 
         ( dg, dgFx ) =
-            Diagram.init syms conns
+            Diagram.init (vec2 (toFloat size.width) (toFloat size.height)) syms conns
     in
         ( dg, layout )
 
@@ -56,22 +56,10 @@ createNode size count ( index, cell ) =
             ( hw, hh )
 
         x =
-            35
-                + 1
-                * fw
-                / 2
-                - fw
-                / 2
-                * cos (toFloat index * slice)
+            (fw / 2) + (fw / 4) * sin (toFloat index * slice)
 
         y =
-            35
-                + 1
-                * fh
-                / 2
-                - fh
-                / 2
-                * sin (toFloat index * slice)
+            (fh / 2) - (fh / 4) * cos (toFloat index * slice)
     in
         LayoutNode cell.content.node.id (vec2 x y) (Color.white) (cell.labelFunc cell.content.node)
 

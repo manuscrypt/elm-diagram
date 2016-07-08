@@ -1,4 +1,4 @@
-module KellyColors exposing (..)
+module Extra.KellyColors exposing (..)
 
 import Color exposing (Color)
 import Maybe exposing (..)

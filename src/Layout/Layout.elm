@@ -1,4 +1,4 @@
-module Layout exposing (..)
+module Layout.Layout exposing (..)
 
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY, sub)
 import Color exposing (Color)

@@ -1,13 +1,13 @@
-module Dependencies exposing (..)
+module Dependencies.ProjectDependencies exposing (..)
 
 import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
 import Html exposing (Html)
 import Html.App as App
 import Http
 import Task
-import ElmFile exposing (ElmFile, decodeList)
-import ElmFileGraph exposing (fromFiles)
-import GraphListView
+import Model.ElmFile exposing (ElmFile, decodeList)
+import Model.ElmFileGraph as ElmFileGraph exposing (fromFiles)
+import Visuals.GraphListView as GraphListView
 
 
 type alias Model =

@@ -1,12 +1,10 @@
-module GraphListView exposing (..)
+module Visuals.GraphListView exposing (..)
 
 import Graph exposing (Graph, Node, NodeContext, NodeId, Edge, Adjacency)
 import Html exposing (Html)
 import Html.Attributes as HA
 import Html.Events as HE
 import IntDict
-import Html.App as App
-import BasicElmDeps
 
 
 type alias Model a b =
@@ -73,29 +71,30 @@ nodeCard model node =
 
 nodeDetail : Model a b -> Html Msg
 nodeDetail model =
-    case model.selectedId of
-        Nothing ->
-            Html.div [] [ Html.text "nothing selected" ]
-
-        Just id ->
-            case Graph.get id model.graph of
+    let
+        content =
+            case model.selectedId of
                 Nothing ->
-                    Html.div [] [ Html.text <| "invalid node-id: " ++ (toString id) ]
+                    [ Html.text "nothing selected" ]
 
-                Just ctx ->
-                    viewContext ctx model
+                Just id ->
+                    case Graph.get id model.graph of
+                        Nothing ->
+                            [ Html.text <| "invalid node-id: " ++ (toString id) ]
 
-
-viewContext : NodeContext a b -> Model a b -> Html Msg
-viewContext ctx model =
-    Html.div [ HA.style [ (,) "width" "100%" ] ]
-        [ Html.div [] [ Html.text <| "Id: " ++ (toString ctx.node.id) ]
-        , Html.div [] [ Html.text <| toString ctx.node.label ]
-        , Html.div [] [ Html.text <| "in: " ++ (toString <| IntDict.size ctx.incoming) ]
-        , viewAdjacent ctx.incoming model
-        , Html.div [] [ Html.text <| "out: " ++ (toString <| IntDict.size ctx.outgoing) ]
-        , viewAdjacent ctx.outgoing model
-        ]
+                        Just ctx ->
+                            [ Html.div [ bb ] [ Html.text <| "Id: " ++ (toString ctx.node.id) ++ ", Label: " ++ toString ctx.node.label ]
+                            , Html.div [ bb ]
+                                [ Html.text <| "in: " ++ (toString <| IntDict.size ctx.incoming)
+                                , viewAdjacent ctx.incoming model
+                                ]
+                            , Html.div [ bb ]
+                                [ Html.text <| "out: " ++ (toString <| IntDict.size ctx.outgoing)
+                                , viewAdjacent ctx.outgoing model
+                                ]
+                            ]
+    in
+        Html.div [ HA.style [ (,) "width" "100%", (,) "padding" "20px" ] ] content
 
 
 viewAdjacent : Adjacency b -> Model a b -> Html Msg
@@ -105,6 +104,11 @@ viewAdjacent adj model =
             List.filterMap (\e -> Graph.get e model.graph) <| IntDict.keys adj
     in
         Html.div [] (List.map (nodeCard model << .node) ctxs)
+
+
+bb : Html.Attribute a
+bb =
+    HA.style [ (,) "border-bottom" "1px solid black", (,) "padding" "4px" ]
 
 
 selectStyle : Node a -> Model a b -> List ( String, String )
@@ -161,18 +165,6 @@ flexHoriz =
         [ (,) "display" "flex"
         , (,) "flex-direction" "row"
         , (,) "flex-wrap" "none"
+        , (,) "margin" "10px"
+        , (,) "padding" "20px"
         ]
-
-
-main : Program Never
-main =
-    let
-        ( g, fn ) =
-            BasicElmDeps.sample2
-    in
-        App.program
-            { init = init g fn
-            , view = view
-            , update = update
-            , subscriptions = (\_ -> Sub.none)
-            }
