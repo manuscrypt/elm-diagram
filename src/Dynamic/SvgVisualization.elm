@@ -21,7 +21,7 @@ connection posA posB =
     [ (bezierLineWithDirection (Math.Vector2.add posA (vec2 0 20))
         (vec2 0 40)
         (vec2 0 -60)
-        (Math.Vector2.add posB (vec2 0 -20))
+        (Math.Vector2.add posB (vec2 0 -30))
         connectionStroke
       )
     , (arrow (Math.Vector2.add posB (vec2 0 -20))
