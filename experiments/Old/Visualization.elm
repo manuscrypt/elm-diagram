@@ -1,15 +1,15 @@
-module Visualization exposing (..)
+module Old.Visualization exposing (..)
 
 import Window
 import Html exposing (Html)
 import Html.App as App
 import Html.Attributes as HA
 import Svg exposing (Svg)
-import Layout.Layout as Layout exposing (LayoutNode, LayoutCell)
 import Visuals.GraphListView as GraphListView
 import Visuals.Diagram as Diagram
-import GraphToDiagram
 import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
+import Old.Layout as Layout exposing (LayoutNode, LayoutCell)
+import Old.GraphToDiagram
 
 
 type alias Model a b =
@@ -35,7 +35,7 @@ init graph size labelFn =
             GraphListView.init graph labelFn
 
         ( dg, layout ) =
-            GraphToDiagram.convert ( graph, labelFn ) size
+            Old.GraphToDiagram.convert ( graph, labelFn ) size
     in
         { graph = graph
         , graphView = newView

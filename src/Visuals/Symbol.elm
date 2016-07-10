@@ -29,9 +29,19 @@ type Msg
     | NoOp
 
 
-init : Int -> String -> Color -> Vec2 -> Vec2 -> ( Model, Cmd Msg )
-init id label color size pos =
-    (Model id label Circle color size pos) ! []
+defaultSize : Vec2
+defaultSize =
+    (vec2 20 20)
+
+
+defaultColor : Color
+defaultColor =
+    Color.white
+
+
+init : Int -> String -> Vec2 -> ( Model, Cmd Msg )
+init id label pos =
+    (Model id label Circle defaultColor defaultSize pos) ! []
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )

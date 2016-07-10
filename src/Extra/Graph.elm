@@ -1,8 +1,12 @@
-module Extra.Graph exposing (isAcyclic, noIncoming, incCount, outCount)
+module Extra.Graph exposing (isAcyclic, noIncoming, incCount, outCount, getNodes)
 
-import Graph exposing (Graph, NodeContext, Node)
+import Graph exposing (Graph, NodeContext, Node, NodeId)
 import IntDict
 
+
+getNodes : List NodeId -> Graph a b -> List (NodeContext a b)
+getNodes nodeIds graph =
+    List.filterMap (\id -> Graph.get id graph) nodeIds
 
 isAcyclic : Graph a b -> Bool
 isAcyclic graph =

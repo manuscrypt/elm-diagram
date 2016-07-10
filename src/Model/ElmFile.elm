@@ -1,4 +1,4 @@
-module Model.ElmFile exposing (ElmFile, decodeList)
+module Model.ElmFile exposing (ElmFile, decodeList, encodeList)
 
 import Json.Encode
 import Json.Decode exposing ((:=))
@@ -18,6 +18,11 @@ type alias ElmFile =
 decodeList : Json.Decode.Decoder (List ElmFile)
 decodeList =
     Json.Decode.list decodeElmFile
+
+
+encodeList : List ElmFile -> Json.Encode.Value
+encodeList list =
+    Json.Encode.list (List.map encodeElmFile list)
 
 
 decodeElmFile : Json.Decode.Decoder ElmFile

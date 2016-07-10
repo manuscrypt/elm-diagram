@@ -109,8 +109,3 @@ subscriptions model =
 ```
 
 which compiles. now it should start working magically. elm-reactor? nope.
-
-
-
-
-

@@ -1,4 +1,4 @@
-module RemoteDepsVisualization exposing (..)
+module Old.RemoteDepsVisualization exposing (..)
 
 --
 -- import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
@@ -13,10 +13,10 @@ module RemoteDepsVisualization exposing (..)
 -- import Task.Extra as Task
 --
 
-import Visualization
 import Model.ElmFile as ElmFile exposing (ElmFile, decodeList)
 import Dict exposing (Dict)
 import Window
+import Old.Visualization as Visualization
 
 
 type alias Model =

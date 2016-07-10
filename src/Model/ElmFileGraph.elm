@@ -28,7 +28,11 @@ makeEdges files =
 
 makeEdge : List ElmFile -> ElmFile -> List (Edge ())
 makeEdge all file =
-    List.map (\f -> Edge file.id f.id ()) <| List.filterMap (findFile all) file.imports
+    let
+        foundImports =
+            List.filterMap (findFile all) file.imports
+    in
+        List.map (\f -> Edge file.id f.id ()) foundImports
 
 
 findFile : List ElmFile -> String -> Maybe ElmFile

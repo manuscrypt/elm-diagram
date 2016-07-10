@@ -3,16 +3,17 @@ module Visuals.Diagram exposing (..)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
 import Html.App as App
 import Dict exposing (insert)
-import Visuals.Symbol as Symbol
-import Visuals.Connection as Connection
 import Svg exposing (Svg)
 import Svg.Attributes as SA
 import Extra.Cmd exposing (noFx)
+import Visuals.Symbol as Symbol
+import Visuals.Connection as Connection
+import Visuals.Grid as Grid
 
 
 type alias Model =
     { size : Vec2
-    , gridSize : Vec2
+    , grid : Grid.Model
     , symbols : Dict.Dict Int Symbol.Model
     , connections : List Connection.Model
     }
@@ -27,12 +28,19 @@ type Msg
 
 init : Vec2 -> List Symbol.Model -> List Connection.Model -> ( Model, Cmd Msg )
 init size syms conns =
-    { size = vec2 (getX size) (getY size)
-    , gridSize = vec2 10 10
-    , symbols = Dict.fromList <| List.map (\r -> ( r.id, r )) syms
-    , connections = conns
-    }
-        ! []
+    let
+        w =
+            (getX size)
+
+        h =
+            (getY size)
+    in
+        { size = vec2 w h
+        , grid = Grid.init ( 0, w ) ( 0, h ) 25
+        , symbols = Dict.fromList <| List.map (\r -> ( r.id, r )) syms
+        , connections = conns
+        }
+            ! []
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -88,11 +96,15 @@ view model =
 
             connections =
                 List.map Connection.view model.connections
+
+            grid =
+                Grid.view model.grid
         in
             Svg.svg
-                [ SA.width sw
+                [ SA.version "1.1"
+                , SA.width sw
                 , SA.height sh
                 , SA.viewBox <| "0 0 " ++ sw ++ " " ++ sh
                 , SA.textRendering "optimizeLegibility"
                 ]
-                (symbols ++ connections)
+                ([ grid ] ++ symbols ++ connections)

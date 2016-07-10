@@ -3,9 +3,8 @@ module BasicDiagram exposing (..)
 import Html
 import Html.App as App
 import Html.Attributes as HA
-import Color exposing (Color)
 import Svg exposing (Svg)
-import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY, sub)
+import Math.Vector2 exposing (Vec2, vec2, getX, getY, setX, setY, sub, fromTuple)
 import Extra.Cmd exposing (noFx, updateOne, updateMany)
 import Visuals.Diagram as Diagram
 import Visuals.Symbol as Symbol
@@ -40,56 +39,22 @@ sample =
     ]
 
 
-sample2 : List ( number, number' )
-sample2 =
-    [ 60 => 60
-    , 220 => 300
-    , 420 => 300
-    , 700 => 240
-    ]
-
-
 sampleCons : List (List number)
 sampleCons =
-    [ [ 0, 1, 2, 3, 4, 5, 6, 7, 8 ]
-    ]
-
-
-sampleCons4 : List (List number)
-sampleCons4 =
-    [ [ 0, 1, 2, 8, 7, 6, 4, 3, 5 ]
-    ]
-
-
-sampleCons2 : List (List number)
-sampleCons2 =
-    [ [ 0, 3, 4, 6 ]
-    , [ 1, 3, 5, 7 ]
-    , [ 2, 5, 8 ]
-    ]
-
-
-sampleCons3 : List (List number)
-sampleCons3 =
     [ [ 0, 3, 5, 8 ]
     , [ 1, 3, 4, 6 ]
     , [ 2, 5, 7 ]
     ]
 
 
-toVec : ( Float, Float ) -> Math.Vector2.Vec2
-toVec ( x, y ) =
-    vec2 x y
-
-
 init : ( Model, Cmd Msg )
 init =
     let
         syms =
-            fst <| List.unzip <| List.indexedMap (\i s -> Symbol.init i (toString i) Color.white (vec2 20 20) <| toVec s) sample
+            fst <| List.unzip <| List.indexedMap (\i s -> Symbol.init i (toString i) <| fromTuple s) sample
 
         msgs' =
-            List.map (\a -> DiagramMsg <| Diagram.Connect a) sampleCons3
+            List.map (\a -> DiagramMsg <| Diagram.Connect a) sampleCons
 
         ( d, dx ) =
             Diagram.init (vec2 500 500) syms []
@@ -119,15 +84,7 @@ update msg model =
 
 diagram : Model -> Svg Msg
 diagram model =
-    Html.div
-        [ HA.style
-            [ (,) "z-index" "1"
-            , (,) "opacity" "1"
-            , (,) "left" "47px"
-            , (,) "position" "relative"
-            ]
-        ]
-        [ App.map DiagramMsg <| Diagram.view model.diagram ]
+    App.map DiagramMsg <| Diagram.view model.diagram
 
 
 template : Svg Msg
@@ -136,7 +93,7 @@ template =
         [ HA.style
             [ (,) "position" "absolute"
             , (,) "top" "-10px"
-            , (,) "left" "35px"
+            , (,) "left" "-9px"
             , (,) "border" "1px solid black"
             , (,) "opacity" "0.1"
             , (,) "z-index" "2"
@@ -152,13 +109,14 @@ view model =
         [ HA.style
             [ (,) "border" "1px solid black"
             , (,) "background-color" "#EEEEEE"
+            , (,) "width" ((toString <| round <| getX model.diagram.size) ++ "px")
             ]
         ]
         [ Html.div []
             [ diagram model
             , template
             ]
-        , Html.div [ HA.style [ (,) "clear" "both", (,) "position" "relative" ] ] [ Html.text <| toString model ]
+          --        , Html.div [ HA.style [ (,) "clear" "both", (,) "position" "relative" ] ] [ Html.text <| toString model ]
         ]
 
 

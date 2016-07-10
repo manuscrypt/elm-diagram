@@ -5,7 +5,7 @@ import Svg.Attributes as SA exposing (..)
 import Html exposing (Html)
 import Html.App as Html
 import Time exposing (Time, second)
-import Dynamic.Layout as DynamicLayout
+import Layouts.Rules as DynamicLayout
 import Dynamic.Diagram as DynamicDiagram
 
 
@@ -84,7 +84,7 @@ init =
                 <|
                     DynamicDiagram.addRootNode { name = "n6" }
                 <|
-                    DynamicDiagram.empty
+                    DynamicDiagram.init
       }
     , Cmd.none
     )
@@ -138,7 +138,7 @@ view model =
             , SA.height "500"
             , viewBox (DynamicLayout.viewboxAsString viewboxMargin model.diagram.layout)
             ]
-            (DynamicDiagram.svgNodes model.diagram)
+            (DynamicDiagram.view model.diagram)
         ]
 
 

@@ -1,9 +1,10 @@
 module Dynamic.Diagram exposing (..)
 
-import Dynamic.Layout as DynamicLayout
+import Layouts.Rules as RulesLayout
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, add, sub, direction)
-import VirtualDom exposing (Node)
-import Dynamic.SvgVisualization
+import Visuals.Grid as Grid
+import Dynamic.SvgVisualization as SvgVisualization
+import VirtualDom
 
 
 {-
@@ -24,24 +25,35 @@ type alias Connection =
 -- MODEL
 
 
+type Msg
+    = NoOp
+
+
 type alias Model =
     { nodes : List Node
     , rootNodes : List Node
     , connections : List Connection
-    , layout : DynamicLayout.Model Node
+    , layout : RulesLayout.Model Node
+    , grid : Grid.Model
     }
 
 
-empty : Model
-empty =
+init : Model
+init =
     { nodes = []
     , rootNodes = []
     , connections = []
     , layout =
-        DynamicLayout.addForEachRule (DynamicLayout.noIntersection 100)
-            <| DynamicLayout.addForOneRule (DynamicLayout.snapToGrid 100)
-            <| DynamicLayout.empty
+        RulesLayout.addForEachRule (RulesLayout.noIntersection 100)
+            <| RulesLayout.addForOneRule (RulesLayout.snapToGrid 100)
+            <| RulesLayout.empty
+    , grid = Grid.empty
     }
+
+
+update : Msg -> Model -> Model
+update msg model =
+    model
 
 
 addRootNode : Node -> Model -> Model
@@ -50,8 +62,8 @@ addRootNode rootNode model =
         | rootNodes = model.rootNodes ++ [ rootNode ]
         , nodes = model.nodes ++ [ rootNode ]
         , layout =
-            DynamicLayout.addNodeAtPosition rootNode (vec2 (toFloat (List.length model.nodes) * 9) 100)
-                <| List.foldr (\otherRoot -> DynamicLayout.addForTwoRule otherRoot (DynamicLayout.hasSameY 0.05) rootNode) model.layout model.rootNodes
+            RulesLayout.addNodeAtPosition rootNode (vec2 (toFloat (List.length model.nodes) * 9) 100)
+                <| List.foldr (\otherRoot -> RulesLayout.addForTwoRule otherRoot (RulesLayout.hasSameY 0.05) rootNode) model.layout model.rootNodes
     }
 
 
@@ -60,8 +72,8 @@ addNode node model =
     { model
         | nodes =
             model.nodes ++ [ node ]
-            --, layout = DynamicLayout.addNode node model.layout
-        , layout = DynamicLayout.addNodeAtPosition node (vec2 (toFloat (List.length model.nodes) * 10) 0) model.layout
+            --, layout = RulesLayout.addNode node model.layout
+        , layout = RulesLayout.addNodeAtPosition node (vec2 (toFloat (List.length model.nodes) * 10) 0) model.layout
     }
 
 
@@ -78,9 +90,9 @@ addImport parent child model =
     { model
         | connections = model.connections ++ [ ( parent, child ) ]
         , layout =
-            DynamicLayout.addForTwoRule child (DynamicLayout.isAbove 100) parent
-                <| DynamicLayout.addForTwoRule child
-                    (DynamicLayout.hasSameX 0.0005)
+            RulesLayout.addForTwoRule child (RulesLayout.isAbove 100) parent
+                <| RulesLayout.addForTwoRule child
+                    (RulesLayout.hasSameX 0.0005)
                     parent
                     model.layout
     }
@@ -89,26 +101,33 @@ addImport parent child model =
 animate : Model -> Model
 animate model =
     { model
-        | layout = DynamicLayout.animate model.layout
+        | layout = RulesLayout.animate model.layout
     }
 
 
-svgNodes : Model -> List (VirtualDom.Node a)
-svgNodes model =
-    (Dynamic.SvgVisualization.grid (DynamicLayout.viewbox 50 model.layout))
-        ++ (List.concat
-                <| List.map
-                    (\( nodeA, nodeB ) ->
-                        Dynamic.SvgVisualization.connection (DynamicLayout.positionOfNode nodeB model.layout)
-                            (DynamicLayout.positionOfNode nodeA model.layout)
-                    )
-                    model.connections
-           )
-        ++ (List.concat
-                <| List.map
-                    (\node ->
-                        Dynamic.SvgVisualization.node (DynamicLayout.positionOfNode node model.layout)
-                            node.name
-                    )
-                    model.nodes
-           )
+view : Model -> List (VirtualDom.Node a)
+view model =
+    let
+        ( minx, miny, maxx, maxy ) =
+            RulesLayout.viewbox 50 model.layout
+
+        grid =
+            Grid.init ( minx, maxx ) ( miny, maxy ) 25
+    in
+        [ Grid.view grid ]
+            ++ (List.concat
+                    <| List.map
+                        (\( nodeA, nodeB ) ->
+                            SvgVisualization.connection (RulesLayout.positionOfNode nodeB model.layout)
+                                (RulesLayout.positionOfNode nodeA model.layout)
+                        )
+                        model.connections
+               )
+            ++ (List.concat
+                    <| List.map
+                        (\node ->
+                            SvgVisualization.node (RulesLayout.positionOfNode node model.layout)
+                                node.name
+                        )
+                        model.nodes
+               )

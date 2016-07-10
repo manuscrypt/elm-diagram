@@ -10,7 +10,7 @@ import Task
 import Http
 import Model.ElmFile as ElmFile exposing (ElmFile, decodeList)
 import Dynamic.Diagram as DynamicDiagram
-import Dynamic.Layout as DynamicLayout
+import Layouts.Rules as DynamicLayout
 
 
 type alias Model =
@@ -41,7 +41,7 @@ init : ( Model, Cmd Msg )
 init =
     { message = "Hello"
     , files = []
-    , diagram = DynamicDiagram.empty
+    , diagram = DynamicDiagram.init
     }
         ! [ (Task.perform ErrorOccurred DataFetched <| Http.get decodeList "http://localhost:3001/")
           ]
@@ -154,6 +154,6 @@ view model =
                 , SA.height "1500"
                 , viewBox (DynamicLayout.viewboxAsString 100 model.diagram.layout)
                 ]
-                (DynamicDiagram.svgNodes model.diagram)
+                (DynamicDiagram.view model.diagram)
             ]
         ]

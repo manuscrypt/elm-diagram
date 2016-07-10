@@ -6,7 +6,7 @@ import Svg.Attributes as SA exposing (..)
 import Html exposing (Html)
 import Html.App as Html
 import Time exposing (Time, second)
-import Dynamic.Layout as DynamicLayout
+import Layouts.Rules as DynamicLayout
 import Dynamic.SvgVisualization as SvgVisualization
 
 

@@ -1,4 +1,4 @@
-module Dependencies.ProjectDependencies exposing (..)
+module ProjectDependencies exposing (..)
 
 import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
 import Html exposing (Html)

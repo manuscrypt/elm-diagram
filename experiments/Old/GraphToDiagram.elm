@@ -1,4 +1,4 @@
-module GraphToDiagram exposing (..)
+module Old.GraphToDiagram exposing (..)
 
 import Window
 import Color
@@ -9,7 +9,7 @@ import Graph exposing (Graph, NodeId, Node, Edge)
 import Visuals.Diagram as Diagram
 import Visuals.Symbol as Symbol
 import Visuals.Connection as Connection
-import Layout.Layout as Layout exposing (LayoutNode, LayoutCell)
+import Old.Layout as Layout exposing (LayoutNode, LayoutCell)
 
 
 convert : ( Graph a b, Node a -> String ) -> Window.Size -> ( Diagram.Model, Layout.Model a b )
@@ -66,7 +66,7 @@ createNode size count ( index, cell ) =
 
 nodeToSymbol : Layout.LayoutNode -> ( Symbol.Model, Cmd Symbol.Msg )
 nodeToSymbol node =
-    Symbol.init node.id node.label node.color (vec2 20 20) node.pos
+    Symbol.init node.id node.label node.pos
 
 
 createSymbols : List Layout.LayoutNode -> ( List Symbol.Model, List (Cmd Symbol.Msg) )

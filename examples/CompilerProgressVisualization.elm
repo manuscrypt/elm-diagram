@@ -1,4 +1,4 @@
-module SvgCompilerProgressVisualization exposing (nothing)
+module CompilerProgressVisualization exposing (nothing)
 
 import Svg exposing (..)
 import Svg.Attributes as SA exposing (..)

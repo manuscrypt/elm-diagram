@@ -1,55 +1,149 @@
-module Dynamic.Layout2 exposing (..)
+module Layouts.Rules exposing (..)
 
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, add, sub, direction)
-import IntDict 
-import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
+
+
+-- RULES
+
+
+type alias Rule nodeType =
+    ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+
+
+type alias ForOneRule nodeType =
+    ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+
+
 
 -- MODEL
 
-type alias Model n e =
-    { graph : Graph n e
-    , positions : IntDict.IntDict  Vec2
+
+type alias Model nodeType =
+    { nodes : List nodeType
+    , positions : List ( nodeType, Vec2 )
+    , velocity : List ( nodeType, Vec2 )
+    , forEachRules : List (Rule nodeType)
+    , forTwoRules : List ( nodeType, Rule nodeType, nodeType )
+    , forOneRules : List (ForOneRule nodeType)
     }
 
-loadGraph : Graph n e -> Model n e 
-loadGraph graph = 
-    { graph = graph
-    , positions = IntDict.fromList <| List.map ( \n -> ( n.id, ( vec2 100 100 ) ) ) ( Graph.nodes graph )
-    }
 
-position : Int -> Model n e -> Vec2 
-position index model = 
-    case IntDict.get index model.positions of
-        Just p -> p
-        Nothing -> 
-            let l = Debug.log "DynamicLayout2.no pos for id" index 
-            in ( vec2 0 0 )
-
-animate : Model n e -> Model n e
-animate layout = layout
-    -- hier kommt die magic
-
-{-
-
-type alias Viewbox =
-    { left : Float
-    , top : Float
-    , right : Float 
-    , bottom : Float
-    }
-    , viewbox : Viewbox
-    , viewbox = Viewbox 0 0 0 0
-
-
-empty : Model n e
+empty : Model nodeType
 empty =
-    { graph = nodes = []
+    { nodes = []
     , positions = []
     , velocity = []
     , forEachRules = []
     , forTwoRules = []
     , forOneRules = []
     }
+
+
+noIntersection : Float -> ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+noIntersection minDistance ( elemA, posA ) ( elemB, posB ) =
+    let
+        diff =
+            (Math.Vector2.sub posA posB)
+
+        dist =
+            (Math.Vector2.length diff)
+    in
+        if (dist > minDistance) then
+            []
+        else
+            let
+                norm =
+                    if (dist < 0.0001) then
+                        (vec2 1 1)
+                    else
+                        (Math.Vector2.normalize diff)
+
+                factor =
+                    0.01 + 0.1 * (minDistance - dist)
+            in
+                [ ( elemA, (Math.Vector2.scale factor norm) )
+                , ( elemB, (Math.Vector2.scale -factor norm) )
+                ]
+
+
+isAbove : Float -> ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+isAbove minDistance ( elemA, posA ) ( elemB, posB ) =
+    let
+        ay =
+            (Math.Vector2.getY posA)
+
+        by =
+            (Math.Vector2.getY posB)
+
+        fact =
+            0.1 + 0.1 * (minDistance - (by - ay))
+    in
+        if (fact < 0) then
+            []
+        else
+            [ ( elemA, (vec2 0 -fact) )
+            , ( elemB, (vec2 0 fact) )
+            ]
+
+
+hasSameY : Float -> ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+hasSameY factor ( elemA, posA ) ( elemB, posB ) =
+    let
+        ay =
+            (Math.Vector2.getY posA)
+
+        by =
+            (Math.Vector2.getY posB)
+
+        fact =
+            factor * (ay - by)
+    in
+        [ ( elemA, (vec2 0 -fact) )
+        , ( elemB, (vec2 0 fact) )
+        ]
+
+
+hasSameX : Float -> ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+hasSameX factor ( elemA, posA ) ( elemB, posB ) =
+    let
+        ay =
+            (Math.Vector2.getX posA)
+
+        by =
+            (Math.Vector2.getX posB)
+
+        fact =
+            factor * (ay - by)
+    in
+        [ ( elemA, (vec2 -fact 0) )
+        , ( elemB, (vec2 fact 0) )
+        ]
+
+
+snapToGridSub : Float -> Float -> Float
+snapToGridSub gridSize pos =
+    let
+        soll =
+            (toFloat <| round (pos / gridSize)) * gridSize
+
+        f =
+            0.05
+    in
+        if (soll < pos) then
+            -f
+        else if (soll > pos) then
+            f
+        else
+            0.0
+
+
+snapToGrid : Float -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+snapToGrid gridSize ( node, pos ) =
+    [ ( node
+      , vec2 (snapToGridSub gridSize (Math.Vector2.getX pos))
+            (snapToGridSub gridSize (Math.Vector2.getY pos))
+      )
+    ]
 
 
 addNode : nodeType -> Model nodeType -> Model nodeType
@@ -229,5 +323,3 @@ combineForces model forces =
 applyForces : Model nodeType -> List ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
 applyForces model velocity =
     List.map (\( node, oldPosition ) -> ( node, applyForcesFor node oldPosition velocity )) model.positions
-
--}

@@ -51,7 +51,6 @@ node pos caption =
       )
     ]
 
-
 gridStroke : Stroke
 gridStroke =
     Stroke Color.lightBlue 0.15
@@ -97,56 +96,3 @@ grid ( minX, minY, maxX, maxY ) =
         --[ gridLine minX minY maxX maxY ] ++
         (gridLinesY minX stepSize maxX minY maxY)
             ++ (gridLinesX minY stepSize maxY minX maxX)
-
-
-
-{- DynamicLayout.viewbox viewboxMargin model.layout
-         stepSize = calcStepSize minY maxY
-     in ( drawLinesX ( toFloat <| round ( minX - stepSize ) ) stepSize maxX minY maxY )
-     ++ ( drawLinesY ( toFloat <| round ( minY - stepSize ) ) stepSize maxY minX maxX )
-
-   calcStepSize : Float -> Float -> Float
-   calcStepSize min max =
-     let d = ( max - min )
-     in if( d < 10 ) then 1
-     else if( d < 100 ) then 10
-     else  100
-
-   drawLinesX : Float -> Float -> Float -> Float -> Float -> List ( VirtualDom.Node a )
-   drawLinesX x stepSize maxX minY maxY =
-     [ SvgUtils.bezierLineWithDirection (vec2 x minY ) (vec2 -1 1) (vec2 1 -1) (vec2 x maxY ) ( Stroke Color.blue 0.3 )
-     ] ++ if( x + stepSize < maxX )then
-       ( drawLinesX ( x + stepSize ) stepSize maxX minY maxY )
-       else []
-
-   drawLinesY : Float -> Float -> Float -> Float -> Float -> List ( VirtualDom.Node a )
-   drawLinesY y stepSize maxY minX maxX =
-     [ SvgUtils.bezierLineWithDirection (vec2 minX y ) (vec2 0 0) (vec2 0 0) (vec2 maxX y ) ( Stroke Color.blue 0.3 )
-     ] ++ if( y + stepSize < maxY )then
-       ( drawLinesY ( y + stepSize ) stepSize maxY minX maxX )
-       else []
-
-
-   viewSvgGrid : Model -> List ( VirtualDom.Node a )
-   viewSvgGrid model =
-     let ( minX, minY, maxX, maxY ) = DynamicLayout.viewbox viewboxMargin model.layout
-         stepSize = calcStepSize minY maxY
-     in ( drawLinesX ( toFloat <| round ( minX - stepSize ) ) stepSize maxX minY maxY )
-     ++ ( drawLinesY ( toFloat <| round ( minY - stepSize ) ) stepSize maxY minX maxX )
-
--}
-{-
-   drawLinesX : Float -> Float -> Float -> Float -> Float -> List ( VirtualDom.Node a )
-   drawLinesX x stepSize maxX minY maxY =
-     [ SvgUtils.bezierLineWithDirection (vec2 x minY ) (vec2 -1 1) (vec2 1 -1) (vec2 x maxY ) ( Stroke Color.blue 0.3 )
-     ] ++ if( x + stepSize < maxX )then
-       ( drawLinesX ( x + stepSize ) stepSize maxX minY maxY )
-       else []
-
-   drawLinesY : Float -> Float -> Float -> Float -> Float -> List ( VirtualDom.Node a )
-   drawLinesY y stepSize maxY minX maxX =
-     [ SvgUtils.bezierLineWithDirection (vec2 minX y ) (vec2 0 0) (vec2 0 0) (vec2 maxX y ) ( Stroke Color.blue 0.3 )
-     ] ++ if( y + stepSize < maxY )then
-       ( drawLinesY ( y + stepSize ) stepSize maxY minX maxX )
-       else []
--}

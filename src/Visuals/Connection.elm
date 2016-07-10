@@ -21,9 +21,9 @@ blackStroke =
     Stroke Color.brown 1
 
 
-init : List Symbol.Model -> Model
-init symbols =
-    Model symbols 3 Color.black
+init : List Symbol.Model  -> Model
+init sybolsToConnect =
+    Model sybolsToConnect 3 Color.black
 
 
 view : Model -> Svg a
