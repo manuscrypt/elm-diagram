@@ -23,41 +23,53 @@ import Model.Layout as Layout
 import Visuals.Symbol as Symbol
 import Visuals.Connection as Connection
 import Visuals.Diagram as Diagram
+
+
 -- MODEL
 
 
-type alias Model=
+type alias Model =
     { graph : Graph Symbol.Model Connection.Model
     , rootNodes : List Symbol.Model
     , layout : Layout.Model
     , diagram : Diagram.Model
     }
 
+
 type Msg
     = NoOp
     | Animate
     | DiagramMsg Diagram.Msg
 
-init : Layout.Model -> (Model, Cmd Msg)
+
+init : Layout.Model -> ( Model, Cmd Msg )
 init layout =
-    let graph = convert layout.graph
-        (dg, dgCmd) = Diagram.init (vec2 500 500) (List.map .label <| Graph.nodes graph) (List.map .label <| Graph.edges graph)
-    in  { rootNodes = []
+    let
+        graph =
+            convert layout.graph
+
+        ( dg, dgCmd ) =
+            Diagram.init (vec2 500 500) (List.map .label <| Graph.nodes graph) (List.map .label <| Graph.edges graph)
+    in
+        { rootNodes = []
         , layout = layout
         , graph = graph
         , diagram = dg
-        } ! [Cmd.map DiagramMsg dgCmd]
+        }
+            ! [ Cmd.map DiagramMsg dgCmd ]
 
-update: Msg -> Model -> (Model, Cmd Msg)
-update msg model = 
-    case msg of 
-        NoOp -> 
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        NoOp ->
             model ! []
-        
-        Animate -> 
+
+        Animate ->
             { model
                 | layout = Layout.animate model.layout
-            } ! []
+            }
+                ! []
 
         DiagramMsg msg ->
             let
@@ -66,12 +78,13 @@ update msg model =
             in
                 ( { model | diagram = d }, Cmd.map DiagramMsg fx )
 
-view: Model -> Html Msg
-view model = 
-    diagram model 
+
+view : Model -> Html Msg
+view model =
+    diagram model
 
 
-diagram : Model-> Svg Msg
+diagram : Model -> Svg Msg
 diagram model =
     Html.div
         [ HA.style
@@ -82,24 +95,34 @@ diagram model =
         ]
         [ App.map DiagramMsg <| Diagram.view model.diagram ]
 
-convert : Graph Vec2 () -> Graph Symbol.Model Connection.Model
+
+convert : Graph ( Vec2, String ) () -> Graph Symbol.Model Connection.Model
 convert g =
-    let nodes = List.map toSymbol <| Graph.nodes g
-        edges = List.map (toConnection nodes) <| Graph.edges g
-    in Graph.fromNodesAndEdges nodes edges
+    let
+        nodes =
+            List.map toSymbol <| Graph.nodes g
 
-toSymbol: Node Vec2 -> Node Symbol.Model
-toSymbol node = 
-    Node node.id  (fst <| Symbol.init node.id "hi" node.label)
+        edges =
+            List.map (toConnection nodes) <| Graph.edges g
+    in
+        Graph.fromNodesAndEdges nodes edges
 
-toConnection: List (Node Symbol.Model) -> Edge b -> Edge Connection.Model
+
+toSymbol : Node ( Vec2, String ) -> Node Symbol.Model
+toSymbol node =
+    Node node.id (fst <| Symbol.init node.id (snd node.label) (fst node.label))
+
+
+toConnection : List (Node Symbol.Model) -> Edge b -> Edge Connection.Model
 toConnection nodes edge =
-    case List.filter (\n -> List.member n.id [edge.from, edge.to] ) nodes of
-        [from,to] -> 
-            Edge from.id to.id <| Connection.init <| [from.label,to.label]
+    case List.filter (\n -> List.member n.id [ edge.from, edge.to ]) nodes of
+        [ from, to ] ->
+            Edge from.id to.id <| Connection.init <| [ from.label, to.label ]
+
         _ ->
-            Debug.crash "invalid edge" 
-    
+            Debug.crash "invalid edge"
+
+
 
 -- addRootNode : Node -> Model -> Model
 -- addRootNode rootNode model =

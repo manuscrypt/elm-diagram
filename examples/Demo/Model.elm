@@ -70,7 +70,7 @@ init =
             Graph.empty
 
         ( lay, layCmd ) =
-            DiagramLayout.init <| Layout.init graph
+            DiagramLayout.init <| Layout.init graph (\x -> x.label.moduleName)
 
         ( lv, lvCmd ) =
             GraphListView.init graph (\node -> node.label.moduleName)
@@ -110,22 +110,33 @@ update msg model =
         SetGraph graph ->
             let
                 ( lay, layCmd ) =
-                    DiagramLayout.init <| Layout.init graph
+                    DiagramLayout.init <| Layout.init graph (\x -> x.moduleName)
+
+                ( lv, lvCmd ) =
+                    GraphListView.init graph (\x -> x.label.moduleName)
             in
                 { model
                     | graph = graph
                     , layout = lay
                     , graphString = Json.encode 2 <| ElmFile.encodeList <| List.map .label <| Graph.nodes graph
+                    , listView = lv
                     , errorMsg = "Graph set"
                 }
-                    ! [ Cmd.map DiagramLayoutMsg layCmd ]
+                    ! [ Cmd.map DiagramLayoutMsg layCmd
+                      , Cmd.map GraphListViewMsg lvCmd
+                      ]
 
         GraphListViewMsg msg ->
             let
                 ( gv, gvx ) =
                     GraphListView.update msg model.listView
             in
-                { model | listView = gv } ! [ Cmd.map GraphListViewMsg gvx ]
+                case msg of
+                    GraphListView.SelectNode nodeId ->
+                        update (SetGraph <| Graph.inducedSubgraph [ nodeId ] model.graph) model
+
+                    _ ->
+                        { model | listView = gv } ! [ Cmd.map GraphListViewMsg gvx ]
 
         TextInputChanged str ->
             let

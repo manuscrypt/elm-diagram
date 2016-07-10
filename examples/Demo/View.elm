@@ -9,6 +9,7 @@ import Random exposing (Seed, initialSeed)
 import Date.Format as Date
 import Model.DiagramLayout as DiagramLayout
 import Demo.Model as Model exposing (Model, Msg(..))
+import Visuals.GraphListView as GraphListView
 
 
 view : Model -> Html Msg
@@ -30,6 +31,7 @@ left model =
     Html.div [ style [ (,) "margin-right" "20px" ] ]
         [ info model
         , controls model
+        , App.map GraphListViewMsg <| GraphListView.view model.listView
         ]
 
 
