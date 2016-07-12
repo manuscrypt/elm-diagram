@@ -16,7 +16,7 @@ http.createServer(function (req, res) {
     var files = [];
     var id = 0;
     res.writeHead(200, {'Content-Type': 'application/json'});
-    readdirp({ root: path.join(__dirname), fileFilter: '*.elm' }).on('data', function (entry) {
+    readdirp({ root: path.join(__dirname, '..'), fileFilter: '*.elm' }).on('data', function (entry) {
         var summ = { id: id++, moduleName: "", name: entry.name, path: entry.path, size: entry.stat.size, imports : [] };
         readline.createInterface({
             input: fs.createReadStream(entry.fullPath),

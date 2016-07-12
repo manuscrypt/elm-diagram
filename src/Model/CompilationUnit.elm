@@ -4,10 +4,6 @@ import Model.ElmFile exposing (ElmFile)
 import Graph exposing (Graph, Node)
 
 
-type alias Filename =
-    ElmFile
-
-
 type CompilationStatus
     = Unknown
     | Compiling
@@ -16,7 +12,7 @@ type CompilationStatus
 
 
 type alias Model =
-    { filename : Filename
+    { file : ElmFile
     , status : CompilationStatus
     }
 
@@ -26,8 +22,8 @@ type Msg
 
 
 init : ElmFile -> Model
-init filename =
-    { filename = filename, status = Unknown }
+init file =
+    { file = file, status = Unknown }
 
 
 update : Msg -> Model -> Model

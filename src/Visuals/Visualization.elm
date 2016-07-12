@@ -6,7 +6,6 @@ import Visuals.Diagram as Diagram
 import Visuals.Symbol as Symbol
 import Visuals.Connection as Connection
 import Model.CompilationUnit as CompilationUnit
-import Model.Layout as Layout exposing (PosAndLabel)
 import Model.ElmFile as ElmFile exposing (ElmFile)
 import Html exposing (Html)
 import Html.Attributes as HA
@@ -17,32 +16,33 @@ import Random exposing (initialSeed)
 
 type alias Model =
     { graph : Graph CompilationUnit.Model ()
-    , layout : Layout.Model
     , diagram : Diagram.Model
     }
 
 
 type Msg
     = DiagramMsg Diagram.Msg
-    | LayoutMsg Layout.Msg
     | Animate
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.batch
+        [ Sub.map DiagramMsg <| Diagram.subscriptions model.diagram
+        ]
 
 
 init : Graph ElmFile () -> Vec2 -> ( Model, Cmd Msg )
 init elmFileGraph size =
     let
-        ( lay, layCmd ) =
-            Layout.init elmFileGraph size (Random.initialSeed 48)
-
-        ( dg, dgCmd ) =
-            Diagram.init (vec2 500 500) lay.graph
+      graph =  CompilationUnit.fromElmFileGraph elmFileGraph
+      diagramGraph = Diagram.diagramGraphFromCompilationUnitGraph graph
+      ( dg, dgCmd ) =
+            Diagram.init (vec2 500 500) diagramGraph
     in
-        { graph = CompilationUnit.fromElmFileGraph elmFileGraph
-        , layout = lay
+        { graph = graph
         , diagram = dg
         }
             ! [ Cmd.map DiagramMsg dgCmd
-              , Cmd.map LayoutMsg layCmd
               ]
 
 
@@ -56,14 +56,8 @@ update msg model =
             in
                 { model | diagram = dg } ! [ Cmd.map DiagramMsg dgCmd ]
 
-        LayoutMsg lMsg ->
-            let
-                ( l, lCmd ) =
-                    Layout.update lMsg model.layout
-            in
-                { model | layout = l } ! [ Cmd.map LayoutMsg lCmd ]
-
         Animate ->
+            {-
             let
                 ( model', cmd1 ) =
                     update (LayoutMsg Layout.Animate) model
@@ -72,6 +66,8 @@ update msg model =
                     update (DiagramMsg (Diagram.SetPositions model'.layout.graph)) model'
             in
                 model'' ! [ cmd1, cmd2 ]
+              -}
+              model ! []
 
 
 view : Model -> Html Msg

@@ -5,7 +5,6 @@ import Http
 import Extra.Http as Http
 import Graph exposing (Graph, Node)
 import Time exposing (Time)
-import AnimationFrame
 import Window exposing (Size)
 import Task
 import Task.Extra as Task exposing (performFailproof)
@@ -56,11 +55,7 @@ type alias Model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ if model.running then
-            AnimationFrame.diffs Animate
-          else
-            Sub.none
-        , Window.resizes Resize
+        [ Sub.map VisualizationMsg <| Visualization.subscriptions model.visualization
         ]
 
 
