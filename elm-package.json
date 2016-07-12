@@ -27,7 +27,7 @@
   "elm-version": "0.17.0 <= v < 0.18.0",
   "linter-elm-make": {
     "mainPaths": [
-      "src/Main.elm"
+      "src/DemoProgram.elm"
     ]
   }
 }

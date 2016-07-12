@@ -10,7 +10,7 @@ import Visuals.Grid as Grid
 import Graph exposing (Graph, Node, NodeId, Edge)
 import Model.CompilationUnit as CompilationUnit
 import Visuals.Layout as Layout
-import IntDict
+--import IntDict
 import AnimationFrame
 import Time exposing (Time)
 
@@ -123,9 +123,44 @@ view model =
 
 
 
+initialPosition : Node CompilationUnit.Model -> Vec2
+initialPosition node =
+    vec2 ( 10.0 + ( ( toFloat node.id ) * 10.0 ) ) ( ( toFloat node.id ) * 11.0 )
+
+
+makeRadial : Model -> Model
+makeRadial model =
+    let newgraph = Graph.mapNodes (initialPos (Graph.size model.graph) model.size) model.graph
+        l = model.layout
+        newlayout = { l | graph = newgraph }
+    in
+    { model
+    | graph = newgraph
+    , layout = newlayout
+    }
+
+initialPos : Int -> Vec2 -> Symbol.Model -> Symbol.Model
+initialPos count size symbol =
+  let
+        slice =
+            degrees (360 / (toFloat count))
+        ( hw, hh ) =
+            ( getX size,  getY size)
+
+        mx =
+            Basics.max hw hh
+
+        ( fw, fh ) =
+            ( mx, mx )
+            --( hw, hh )
+
+        x = fw / 2 - fw / 2 * cos (toFloat symbol.id * slice)
+        y = fh / 2 + fh / 2 * sin (toFloat symbol.id * slice)
+    in { symbol | pos = vec2 x y }
+
 toSymbol : Node CompilationUnit.Model -> Node Symbol.Model
 toSymbol node =
-   Node node.id (fst <| Symbol.init node.id node.label.file.moduleName ( vec2 0 0 ) )
+   Node node.id (fst <| Symbol.init node.id node.label.file.moduleName <| initialPosition node )
 
 toConnection : List (Node Symbol.Model) -> Edge () -> Edge Connection.Model
 toConnection symbols edge =

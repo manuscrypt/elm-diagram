@@ -87,6 +87,7 @@ init =
               , checkServerStatus
               , Cmd.map GraphListViewMsg lvCmd
               , Cmd.map VisualizationMsg visCmd
+              , fetchData RemoteFetched
               ]
 
 

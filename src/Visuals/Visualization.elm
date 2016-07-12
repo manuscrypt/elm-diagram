@@ -3,15 +3,12 @@ module Visuals.Visualization exposing (..)
 import Graph exposing (Graph, Node, Edge, NodeId)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
 import Visuals.Diagram as Diagram
-import Visuals.Symbol as Symbol
-import Visuals.Connection as Connection
 import Model.CompilationUnit as CompilationUnit
 import Model.ElmFile as ElmFile exposing (ElmFile)
 import Html exposing (Html)
 import Html.Attributes as HA
 import Html.App as App
 import Svg exposing (Svg)
-import Random exposing (initialSeed)
 
 
 type alias Model =
@@ -40,7 +37,7 @@ init elmFileGraph size =
             Diagram.init (vec2 500 500) diagramGraph
     in
         { graph = graph
-        , diagram = dg
+        , diagram = Diagram.makeRadial <|  dg
         }
             ! [ Cmd.map DiagramMsg dgCmd
               ]
