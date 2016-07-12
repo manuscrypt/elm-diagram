@@ -37,7 +37,9 @@ init elmFileGraph size =
             Diagram.init (vec2 500 500) diagramGraph
     in
         { graph = graph
-        , diagram = Diagram.makeRadial <|  dg
+        , diagram =
+            --Diagram.makeRadial <|
+             dg
         }
             ! [ Cmd.map DiagramMsg dgCmd
               ]

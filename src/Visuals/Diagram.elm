@@ -125,7 +125,7 @@ view model =
 
 initialPosition : Node CompilationUnit.Model -> Vec2
 initialPosition node =
-    vec2 ( 10.0 + ( ( toFloat node.id ) * 10.0 ) ) ( ( toFloat node.id ) * 11.0 )
+    vec2 ( 210.0 + ( ( toFloat node.id ) * 10.0 ) ) ( 210.0 + ( ( toFloat node.id ) * 11.0 ))
 
 
 makeRadial : Model -> Model

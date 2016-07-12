@@ -136,7 +136,7 @@ calcForcesOneOnOneFor nodeA nodeB model forces =
       <| if( ay + 80 > by )then
         Vec2Dict.add2
           ( nodeA.node.id, vec2 0 -1.1 )
-          ( nodeB.node.id, vec2 0  1.1 )
+          ( nodeB.node.id, vec2 0 1.1 )
           forces
       else
         forces
