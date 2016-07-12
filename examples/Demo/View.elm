@@ -7,9 +7,9 @@ import Html.App as App
 import Graph exposing (Graph, Node)
 import Random exposing (Seed, initialSeed)
 import Date.Format as Date
-import Model.DiagramLayout as DiagramLayout
 import Demo.Model as Model exposing (Model, Msg(..))
 import Visuals.GraphListView as GraphListView
+import Visuals.Visualization as Visualization
 
 
 view : Model -> Html Msg
@@ -95,10 +95,10 @@ debug : Model -> Html Msg
 debug model =
     Html.div []
         [ p [] [ text <| Graph.toString' model.graph ]
-        , p [] [ text <| toString model.layout ]
+        , p [] [ text <| toString model.visualization ]
         ]
 
 
 right : Model -> Html Msg
 right model =
-    App.map DiagramLayoutMsg <| DiagramLayout.view model.layout
+    App.map VisualizationMsg <| Visualization.view model.visualization

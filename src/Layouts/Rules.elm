@@ -3,15 +3,20 @@ module Layouts.Rules exposing (..)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, add, sub, direction)
 
 
+type alias NodeWithPos nodeType =
+    ( nodeType, Vec2 )
+
+
+
 -- RULES
 
 
 type alias Rule nodeType =
-    ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+    NodeWithPos nodeType -> NodeWithPos nodeType -> List (NodeWithPos nodeType)
 
 
 type alias ForOneRule nodeType =
-    ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+    NodeWithPos nodeType -> List (NodeWithPos nodeType)
 
 
 
@@ -20,16 +25,20 @@ type alias ForOneRule nodeType =
 
 type alias Model nodeType =
     { nodes : List nodeType
-    , positions : List ( nodeType, Vec2 )
-    , velocity : List ( nodeType, Vec2 )
+    , positions : List (NodeWithPos nodeType)
+    , velocity : List (NodeWithPos nodeType)
     , forEachRules : List (Rule nodeType)
     , forTwoRules : List ( nodeType, Rule nodeType, nodeType )
     , forOneRules : List (ForOneRule nodeType)
     }
 
 
-empty : Model nodeType
-empty =
+type Msg
+    = NoOp
+
+
+init : Model nodeType
+init =
     { nodes = []
     , positions = []
     , velocity = []
@@ -39,7 +48,30 @@ empty =
     }
 
 
-noIntersection : Float -> ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+animate : Model nodeType -> Model nodeType
+animate model =
+    let
+        newForces =
+            combineForces model
+                ((calcForEachForces model.positions model.forEachRules)
+                    ++ (calcForTwoForces model)
+                    ++ (List.concat <| List.map (\( node, pos ) -> List.concat <| List.map (\rule -> rule ( node, pos )) model.forOneRules) model.positions)
+                    ++ model.velocity
+                )
+
+        newPositions =
+            applyForces model newForces
+
+        newVelocity =
+            List.map (\( node, vel ) -> ( node, Math.Vector2.scale 0.2751 vel )) newForces
+    in
+        { model
+            | positions = newPositions
+            , velocity = newVelocity
+        }
+
+
+noIntersection : Float -> NodeWithPos nodeType -> NodeWithPos nodeType -> List (NodeWithPos nodeType)
 noIntersection minDistance ( elemA, posA ) ( elemB, posB ) =
     let
         diff =
@@ -66,7 +98,7 @@ noIntersection minDistance ( elemA, posA ) ( elemB, posB ) =
                 ]
 
 
-isAbove : Float -> ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+isAbove : Float -> NodeWithPos nodeType -> NodeWithPos nodeType -> List (NodeWithPos nodeType)
 isAbove minDistance ( elemA, posA ) ( elemB, posB ) =
     let
         ay =
@@ -86,7 +118,7 @@ isAbove minDistance ( elemA, posA ) ( elemB, posB ) =
             ]
 
 
-hasSameY : Float -> ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+hasSameY : Float -> NodeWithPos nodeType -> NodeWithPos nodeType -> List (NodeWithPos nodeType)
 hasSameY factor ( elemA, posA ) ( elemB, posB ) =
     let
         ay =
@@ -103,7 +135,7 @@ hasSameY factor ( elemA, posA ) ( elemB, posB ) =
         ]
 
 
-hasSameX : Float -> ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+hasSameX : Float -> NodeWithPos nodeType -> NodeWithPos nodeType -> List (NodeWithPos nodeType)
 hasSameX factor ( elemA, posA ) ( elemB, posB ) =
     let
         ay =
@@ -137,7 +169,7 @@ snapToGridSub gridSize pos =
             0.0
 
 
-snapToGrid : Float -> ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+snapToGrid : Float -> NodeWithPos nodeType -> List (NodeWithPos nodeType)
 snapToGrid gridSize ( node, pos ) =
     [ ( node
       , vec2 (snapToGridSub gridSize (Math.Vector2.getX pos))
@@ -231,40 +263,17 @@ viewboxAsString margin model =
         (toString minX) ++ " " ++ (toString minY) ++ " " ++ (toString (maxX - minX)) ++ " " ++ (toString (maxY - minY))
 
 
-animate : Model nodeType -> Model nodeType
-animate model =
-    let
-        newForces =
-            combineForces model
-                ((calcForEachForces model.positions model.forEachRules)
-                    ++ (calcForTwoForces model)
-                    ++ (List.concat <| List.map (\( node, pos ) -> List.concat <| List.map (\rule -> rule ( node, pos )) model.forOneRules) model.positions)
-                    ++ model.velocity
-                )
-
-        newPositions =
-            applyForces model newForces
-
-        newVelocity =
-            List.map (\( node, vel ) -> ( node, Math.Vector2.scale 0.2751 vel )) newForces
-    in
-        { model
-            | positions = newPositions
-            , velocity = newVelocity
-        }
-
-
-calcForEachForce : ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> Rule nodeType -> List ( nodeType, Vec2 )
+calcForEachForce : NodeWithPos nodeType -> NodeWithPos nodeType -> Rule nodeType -> List (NodeWithPos nodeType)
 calcForEachForce ( nodeA, posA ) ( nodeB, posB ) rule =
     rule ( nodeA, posA ) ( nodeB, posB )
 
 
-calcForEachForcesFor : ( nodeType, Vec2 ) -> ( nodeType, Vec2 ) -> List (Rule nodeType) -> List ( nodeType, Vec2 )
+calcForEachForcesFor : NodeWithPos nodeType -> NodeWithPos nodeType -> List (Rule nodeType) -> List (NodeWithPos nodeType)
 calcForEachForcesFor ( nodeA, posA ) ( nodeB, posB ) forEachRules =
     List.concat <| List.map (\rule -> calcForEachForce ( nodeA, posA ) ( nodeB, posB ) rule) forEachRules
 
 
-calcForEachForces : List ( nodeType, Vec2 ) -> List (Rule nodeType) -> List ( nodeType, Vec2 )
+calcForEachForces : List (NodeWithPos nodeType) -> List (Rule nodeType) -> List (NodeWithPos nodeType)
 calcForEachForces nodeAndPosList forEachRules =
     case (List.head nodeAndPosList) of
         Nothing ->
@@ -279,7 +288,7 @@ calcForEachForces nodeAndPosList forEachRules =
                     ++ (calcForEachForces others forEachRules)
 
 
-calcForTwoForces : Model nodeType -> List ( nodeType, Vec2 )
+calcForTwoForces : Model nodeType -> List (NodeWithPos nodeType)
 calcForTwoForces model =
     List.concat
         <| List.map
@@ -289,7 +298,7 @@ calcForTwoForces model =
             model.forTwoRules
 
 
-combineForcesFor : nodeType -> Vec2 -> List ( nodeType, Vec2 ) -> Vec2
+combineForcesFor : nodeType -> Vec2 -> List (NodeWithPos nodeType) -> Vec2
 combineForcesFor node oldPosition forces =
     List.foldl
         (\( anyNode, force ) pos ->
@@ -302,7 +311,7 @@ combineForcesFor node oldPosition forces =
         forces
 
 
-applyForcesFor : nodeType -> Vec2 -> List ( nodeType, Vec2 ) -> Vec2
+applyForcesFor : nodeType -> Vec2 -> List (NodeWithPos nodeType) -> Vec2
 applyForcesFor node oldPosition forces =
     List.foldl
         (\( anyNode, force ) pos ->
@@ -315,11 +324,11 @@ applyForcesFor node oldPosition forces =
         forces
 
 
-combineForces : Model nodeType -> List ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+combineForces : Model nodeType -> List (NodeWithPos nodeType) -> List (NodeWithPos nodeType)
 combineForces model forces =
     List.map (\node -> ( node, combineForcesFor node (vec2 0 0) forces )) model.nodes
 
 
-applyForces : Model nodeType -> List ( nodeType, Vec2 ) -> List ( nodeType, Vec2 )
+applyForces : Model nodeType -> List (NodeWithPos nodeType) -> List (NodeWithPos nodeType)
 applyForces model velocity =
     List.map (\( node, oldPosition ) -> ( node, applyForcesFor node oldPosition velocity )) model.positions

@@ -106,7 +106,7 @@ sampleLayout =
         <| DynamicLayout.addForTwoRule sampleNode7 (DynamicLayout.hasSameY 0.05) sampleNode8
         <| makeDepsSameY
         <| (List.foldl makeConn
-                (List.foldl DynamicLayout.addNode DynamicLayout.empty sampleNodes)
+                (List.foldl DynamicLayout.addNode DynamicLayout.init sampleNodes)
                 sampleConnections
            )
 

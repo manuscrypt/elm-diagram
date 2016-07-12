@@ -2,9 +2,7 @@ module Dynamic.Test9 exposing (..)
 
 import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
 import Html exposing (Html)
-import Html.Attributes as HA
 import Html.App as App
-import VirtualDom
 import Svg exposing (..)
 import Svg.Attributes as SA exposing (..)
 import Http
@@ -36,29 +34,19 @@ main =
     App.program
         { init = init
         , view = view
-        , update =
-            update
-            --, subscriptions = ( Time.every (17 * Time.millisecond) Tick )
-            -- ] --(\_ -> Sub.none)
+        , update = update
         , subscriptions = (\model -> Sub.batch [ Time.every (17 * Time.millisecond) Tick ])
         }
 
 
 init : ( Model, Cmd Msg )
 init =
-    let
-        g =
-            Graph.empty
-
-        labelFn =
-            (\x -> x.label.name ++ " (" ++ x.label.moduleName ++ ")")
-    in
-        { graph = g
-        , labelFn = labelFn
-        , error = "no error"
-        , diagram = DynamicDiagram.init
-        }
-            ! [ fetchData ]
+    { graph = Graph.empty
+    , labelFn = (\x -> x.label.name ++ " (" ++ x.label.moduleName ++ ")")
+    , error = "no error"
+    , diagram = DynamicDiagram.init
+    }
+        ! [ fetchData ]
 
 
 fetchData : Cmd Msg
@@ -80,13 +68,10 @@ update msg model =
             let
                 newGraph =
                     ElmFileGraph.fromFiles elmFiles
-
-                newDiagram =
-                    loadDiagram newGraph model.diagram
             in
                 { model
                     | graph = newGraph
-                    , diagram = newDiagram
+                    , diagram = loadDiagram newGraph model.diagram
                 }
                     ! []
 

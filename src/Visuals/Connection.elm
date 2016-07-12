@@ -21,9 +21,9 @@ blackStroke =
     Stroke Color.brown 1
 
 
-init : List Symbol.Model  -> Model
-init sybolsToConnect =
-    Model sybolsToConnect 3 Color.black
+init : List Symbol.Model -> Model
+init symbolsToConnect =
+    Model symbolsToConnect 3 Color.black
 
 
 view : Model -> Svg a
@@ -38,14 +38,7 @@ view model =
 
 createSplines : List Symbol.Model -> List (VirtualDom.Node a)
 createSplines nodes =
-    let
-        positions =
-            List.map .pos nodes
-
-        paths =
-            List.map (Extra.Svg.toPath "stroke:black;stroke-width:1px;fill:none") <| Extra.Spline.splines positions
-    in
-        paths
+    List.map (Extra.Svg.toPath "stroke:black;stroke-width:1px;fill:none") <| Extra.Spline.splines <| List.map .pos nodes
 
 
 createEdges : List Symbol.Model -> List (VirtualDom.Node a)

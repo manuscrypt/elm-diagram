@@ -42,24 +42,6 @@ fromList strs =
     List.map init strs
 
 
-fromElmFileGraph : Graph ElmFile () -> ( Graph Model (), Node Model -> String )
+fromElmFileGraph : Graph ElmFile () -> Graph Model ()
 fromElmFileGraph elmFiles =
-    let
-        basic =
-            Graph.nodes elmFiles
-                |> Debug.log "elms"
-                |> List.filter (\n -> n.label.name == "Basic.elm")
-                |> List.head
-    in
-        case basic of
-            Nothing ->
-                Debug.crash "No Basic.elm found"
-
-            Just b ->
-                let
-                    smaller =
-                        Graph.inducedSubgraph [ b.id ] elmFiles
-                in
-                    ( Graph.mapNodes init smaller
-                    , (\a -> a.label.filename.name)
-                    )
+    Graph.mapNodes init elmFiles

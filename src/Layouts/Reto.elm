@@ -1,15 +1,8 @@
-module Dynamic.Diagram exposing (..)
+module Layouts.Reto exposing (..)
 
-import Layouts.Rules as RulesLayout
+import Model.LayoutConfig as Config
 import Math.Vector2 exposing (Vec2, vec2, getX, getY, add, sub, direction)
-import Visuals.Grid as Grid
-import Dynamic.SvgVisualization as SvgVisualization
-import VirtualDom
-
-
-{-
-   --  SAMPLE
--}
+import Layouts.Rules as RulesLayout
 
 
 type alias Node =
@@ -21,42 +14,40 @@ type alias Connection =
     ( Node, Node )
 
 
-
--- MODEL
-
-
-type Msg
-    = NoOp
-
-
-type alias Model =
+type alias LayoutData =
     { nodes : List Node
     , rootNodes : List Node
     , connections : List Connection
     , layout : RulesLayout.Model Node
-    , grid : Grid.Model
     }
+
+
+type alias Model =
+    Config.Model Node LayoutData
 
 
 init : Model
 init =
+    Config.init empty addRootNode addNode containsNode addImport animate
+
+
+empty : LayoutData
+empty =
     { nodes = []
     , rootNodes = []
     , connections = []
-    , layout =
-        RulesLayout.addForEachRule (RulesLayout.noIntersection 100)
-            <| RulesLayout.addForOneRule (RulesLayout.snapToGrid 100)
-            <| RulesLayout.init
-    , grid = Grid.empty
+    , layout = defaultLayout
     }
 
 
-update : Msg -> Model -> Model
-update msg model =
-    model
+defaultLayout : RulesLayout.Model Node
+defaultLayout =
+    RulesLayout.addForEachRule (RulesLayout.noIntersection 100)
+        <| RulesLayout.addForOneRule (RulesLayout.snapToGrid 100)
+        <| RulesLayout.init
 
 
-addRootNode : Node -> Model -> Model
+addRootNode : Node -> LayoutData -> LayoutData
 addRootNode rootNode model =
     { model
         | rootNodes = model.rootNodes ++ [ rootNode ]
@@ -67,7 +58,7 @@ addRootNode rootNode model =
     }
 
 
-addNode : Node -> Model -> Model
+addNode : Node -> LayoutData -> LayoutData
 addNode node model =
     { model
         | nodes =
@@ -77,7 +68,7 @@ addNode node model =
     }
 
 
-containsNode : Node -> Model -> Bool
+containsNode : Node -> LayoutData -> Bool
 containsNode node model =
     if (0 == (List.length (List.filter (\n -> n == node) model.nodes))) then
         False
@@ -85,7 +76,7 @@ containsNode node model =
         True
 
 
-addImport : Node -> Node -> Model -> Model
+addImport : Node -> Node -> LayoutData -> LayoutData
 addImport parent child model =
     { model
         | connections = model.connections ++ [ ( parent, child ) ]
@@ -98,36 +89,8 @@ addImport parent child model =
     }
 
 
-animate : Model -> Model
+animate : LayoutData -> LayoutData
 animate model =
     { model
         | layout = RulesLayout.animate model.layout
     }
-
-
-view : Model -> List (VirtualDom.Node a)
-view model =
-    let
-        ( minx, miny, maxx, maxy ) =
-            RulesLayout.viewbox 50 model.layout
-
-        grid =
-            Grid.init ( minx, maxx ) ( miny, maxy ) 25
-    in
-        [ Grid.view grid ]
-            ++ (List.concat
-                    <| List.map
-                        (\( nodeA, nodeB ) ->
-                            SvgVisualization.connection (RulesLayout.positionOfNode nodeB model.layout)
-                                (RulesLayout.positionOfNode nodeA model.layout)
-                        )
-                        model.connections
-               )
-            ++ (List.concat
-                    <| List.map
-                        (\node ->
-                            SvgVisualization.node (RulesLayout.positionOfNode node model.layout)
-                                node.name
-                        )
-                        model.nodes
-               )

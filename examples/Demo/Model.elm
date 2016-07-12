@@ -1,5 +1,6 @@
 module Demo.Model exposing (..)
 
+import Math.Vector2 as Vec2 exposing (Vec2, vec2)
 import Http
 import Extra.Http as Http
 import Graph exposing (Graph, Node)
@@ -15,10 +16,10 @@ import Model.ElmFileGraph as ElmFileGraph exposing (ElmFileGraph)
 import Json.Decode as Json
 import Json.Encode as Json
 import Result
-import Model.DiagramLayout as DiagramLayout
-import Model.Layout as Layout
-import Layouts.Rules as Rules
 import Visuals.GraphListView as GraphListView
+import Visuals.Visualization as Visualization
+import Maybe
+import IntDict
 
 
 type Msg
@@ -33,7 +34,7 @@ type Msg
     | FetchRemote
     | SetGraph (ElmFileGraph)
     | RemoteFetched (List ElmFile)
-    | DiagramLayoutMsg DiagramLayout.Msg
+    | VisualizationMsg Visualization.Msg
     | GraphListViewMsg GraphListView.Msg
 
 
@@ -41,13 +42,13 @@ type alias Model =
     { graph : ElmFileGraph
     , graphString : String
     , lastDt : Time
-    , size : Size
+    , size : Vec2
     , errorMsg : String
     , now : Maybe Date
     , seed : Seed
     , running : Bool
     , serverRunning : Bool
-    , layout : DiagramLayout.Model
+    , visualization : Visualization.Model
     , listView : GraphListView.Model ElmFile ()
     }
 
@@ -69,28 +70,28 @@ init =
         graph =
             Graph.empty
 
-        ( lay, layCmd ) =
-            DiagramLayout.init <| Layout.init graph (\x -> x.label.moduleName)
-
         ( lv, lvCmd ) =
             GraphListView.init graph (\node -> node.label.moduleName)
+
+        ( vis, visCmd ) =
+            Visualization.init graph (vec2 0 0)
     in
         { graph = graph
         , graphString = ""
         , lastDt = 0
-        , size = { width = 0, height = 0 }
+        , size = vec2 0 0
         , errorMsg = ""
         , seed = initialSeed Random.minInt
         , now = Nothing
         , running = False
         , serverRunning = False
-        , layout = lay
+        , visualization = vis
         , listView = lv
         }
             ! [ Time.now |> performFailproof Init
               , checkServerStatus
               , Cmd.map GraphListViewMsg lvCmd
-              , Cmd.map DiagramLayoutMsg layCmd
+              , Cmd.map VisualizationMsg visCmd
               ]
 
 
@@ -105,25 +106,33 @@ update msg model =
                 ! [ Window.size |> performFailproof Resize ]
 
         ServerReachable b ->
-            { model | serverRunning = b } ! []
+            { model
+                | serverRunning = b
+                , errorMsg =
+                    if b then
+                        "Server available"
+                    else
+                        "Server unreachable"
+            }
+                ! []
 
         SetGraph graph ->
             let
-                ( lay, layCmd ) =
-                    DiagramLayout.init <| Layout.init graph (\x -> x.moduleName)
-
                 ( lv, lvCmd ) =
                     GraphListView.init graph (\x -> x.label.moduleName)
+
+                ( vis, visCmd ) =
+                    Visualization.init graph model.size
             in
                 { model
                     | graph = graph
-                    , layout = lay
                     , graphString = Json.encode 2 <| ElmFile.encodeList <| List.map .label <| Graph.nodes graph
                     , listView = lv
+                    , visualization = vis
                     , errorMsg = "Graph set"
                 }
-                    ! [ Cmd.map DiagramLayoutMsg layCmd
-                      , Cmd.map GraphListViewMsg lvCmd
+                    ! [ Cmd.map GraphListViewMsg lvCmd
+                      , Cmd.map VisualizationMsg visCmd
                       ]
 
         GraphListViewMsg msg ->
@@ -133,7 +142,11 @@ update msg model =
             in
                 case msg of
                     GraphListView.SelectNode nodeId ->
-                        update (SetGraph <| Graph.inducedSubgraph [ nodeId ] model.graph) model
+                        let
+                            nodeIds =
+                                Maybe.withDefault [] <| Maybe.map IntDict.keys <| Maybe.map .outgoing <| Graph.get nodeId model.graph
+                        in
+                            update (SetGraph <| Graph.inducedSubgraph nodeIds model.graph) model
 
                     _ ->
                         { model | listView = gv } ! [ Cmd.map GraphListViewMsg gvx ]
@@ -159,12 +172,12 @@ update msg model =
         Animate dt ->
             let
                 ( anim, animCmd ) =
-                    DiagramLayout.update DiagramLayout.Animate model.layout
+                    Visualization.update Visualization.Animate model.visualization
             in
-                { model | lastDt = dt, layout = anim } ! [ Cmd.map DiagramLayoutMsg animCmd ]
+                { model | lastDt = dt, visualization = anim } ! [ Cmd.map VisualizationMsg animCmd ]
 
         Resize size ->
-            { model | size = size } ! []
+            { model | size = vec2 (toFloat size.width) (toFloat size.height) } ! []
 
         FetchRemote ->
             { model | errorMsg = "Fetching..." } ! [ fetchData RemoteFetched ]
@@ -172,12 +185,12 @@ update msg model =
         RemoteFetched elmFiles ->
             update (SetGraph <| ElmFileGraph.fromFiles elmFiles) model
 
-        DiagramLayoutMsg msg ->
+        VisualizationMsg msg ->
             let
                 ( d, dx ) =
-                    DiagramLayout.update msg model.layout
+                    Visualization.update msg model.visualization
             in
-                { model | layout = d } ! [ Cmd.map DiagramLayoutMsg dx ]
+                { model | visualization = d } ! [ Cmd.map VisualizationMsg dx ]
 
 
 fetchData : (List ElmFile -> Msg) -> Cmd Msg
@@ -200,10 +213,3 @@ head url =
         , url = url
         , body = Http.empty
         }
-
-
-defaultRules : Rules.Model n
-defaultRules =
-    Rules.addForEachRule (Rules.noIntersection 100)
-        <| Rules.addForOneRule (Rules.snapToGrid 100)
-        <| Rules.empty

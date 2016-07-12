@@ -1,43 +1,62 @@
 module Model.Layout exposing (..)
 
-import Math.Vector2 exposing (Vec2, vec2, getX, getY, add, sub, direction)
-import Graph exposing (Graph, Node, NodeId, NodeContext)
+import Graph exposing (Graph, NodeContext, Node, Edge)
+import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY, fromTuple)
+import Model.ElmFile as ElmFile exposing (ElmFile)
+import Random exposing (Generator, pair, float, Seed, step)
 
 
--- MODEL
+type alias PosAndLabel =
+    ( Vec2, String )
 
 
 type alias Model =
-    { graph : Graph ( Vec2, String ) ()
+    { graph : Graph PosAndLabel ()
+    , seed : Random.Seed
     }
 
 
-init : Graph { n | id : Int, moduleName : String } e -> ({ n | id : Int, moduleName : String } -> String) -> Model
-init graph labelFn =
+type Msg
+    = Animate
+
+
+init : Graph ElmFile () -> Vec2 -> Seed -> ( Model, Cmd Msg )
+init elmFileGraph size seed =
     let
-        mapped =
-            Graph.mapNodes (\n -> (,) (vec2 (50 + (toFloat n.id) * 10) 250) (labelFn n)) graph
-
-        mapped' =
-            Graph.mapEdges (\e -> ()) mapped
+        ( nodes, nextSeed ) =
+            List.foldl (randomlyPlacedNode size) ( [], seed ) <| Graph.nodes elmFileGraph
     in
-        { graph = mapped' }
+        { graph = Graph.fromNodesAndEdges nodes (Graph.edges elmFileGraph)
+        , seed = nextSeed
+        }
+            ! []
 
 
-position : NodeId -> Model -> Vec2
-position nodeId model =
-    case Graph.get nodeId model.graph of
-        Just ctx ->
-            fst ctx.node.label
-
-        Nothing ->
-            Debug.crash <| "node not found with id: " ++ toString nodeId
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        Animate ->
+            model ! []
 
 
-animate : Model -> Model
-animate layout =
-    layout
+randomPoint : Vec2 -> Generator ( Float, Float )
+randomPoint size =
+    pair (float 0 <| getX size) (float 0 <| getY size)
 
 
+randomlyPlacedNode : Vec2 -> Node ElmFile -> ( List (Node PosAndLabel), Seed ) -> ( List (Node PosAndLabel), Seed )
+randomlyPlacedNode size node ( list, seed ) =
+    let
+        ( p, nextSeed ) =
+            makePoint size seed
+    in
+        ( list ++ [ Node node.id ( p, node.label.moduleName ) ], nextSeed )
 
--- hier kommt die magic
+
+makePoint : Vec2 -> Seed -> ( Vec2, Seed )
+makePoint size seed =
+    let
+        ( p, s ) =
+            step (randomPoint size) seed
+    in
+        ( fromTuple p, s )

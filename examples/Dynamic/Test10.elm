@@ -42,19 +42,21 @@ main =
         }
 
 
+labelFn : { b | label : { a | moduleName : String, name : String } } -> String
+labelFn =
+    (\x -> x.label.name ++ " (" ++ x.label.moduleName ++ ")")
+
+
 init : ( Model, Cmd Msg )
 init =
     let
         g =
             Graph.empty
-
-        labelFn =
-            (\x -> x.label.name ++ " (" ++ x.label.moduleName ++ ")")
     in
         { graph = g
         , labelFn = labelFn
         , error = "no error"
-        , layout = Layout.init g
+        , layout = Layout.init g labelFn
         }
             ! [ fetchData ]
 
@@ -81,7 +83,7 @@ update msg model =
             in
                 { model
                     | graph = newGraph
-                    , layout = Layout.init newGraph
+                    , layout = Layout.init newGraph (\x -> x.moduleName)
                 }
                     ! []
 
