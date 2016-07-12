@@ -7,11 +7,12 @@ import Graph exposing (Graph, Node, Edge, NodeId)
 import List.Extra exposing (andThen)
 import Time exposing (Time)
 import Maybe
+import IntDict
 import Extra.Vec2Dict as Vec2Dict exposing( Vec2Dict )
 
 type alias Model =
   { graph : Graph Symbol.Model Connection.Model
-  --, velocities : Vec2Dict
+  , velocities : Vec2Dict
   }
 
 type Msg
@@ -20,7 +21,7 @@ type Msg
 init: Graph Symbol.Model Connection.Model -> (Model, Cmd Msg)
 init graph =
   { graph = graph
-  --, velocities = Vec2Dict.empty
+  , velocities = Vec2Dict.empty
   } ! []
 
 symbols : Model -> List Symbol.Model
@@ -38,7 +39,13 @@ animate: Time -> Model -> Model
 animate dt model =
   let
       forces = calcForces model
---      velocities' =
+      velocities' = IntDict.uniteWith
+        ( \ index force velocity ->
+            -- v = a * t + v0
+            Vec2.add
+              ( Vec2.scale ( dt * 0.0001 ) force )
+              ( Vec2.scale ( 0.999 ) velocity )
+        ) forces model.velocities
       graph' = Graph.mapNodes ( \node ->
           let
             force = ( Vec2Dict.get node.id forces )
@@ -73,7 +80,7 @@ calcForcesOneVsAll model forces =
 calcForcesForNoIntersection : Symbol.Model -> Symbol.Model -> Vec2Dict -> Vec2Dict
 calcForcesForNoIntersection elemA elemB forces =
     let
-        minDistance = 40
+        minDistance = 50
         posA = elemA.pos
         posB = elemB.pos
         diff = (Vec2.sub posA posB)
@@ -123,13 +130,13 @@ calcForcesOneOnOneFor nodeA nodeB model forces =
     in
       -- a und b sollten gleiches x haben
       Vec2Dict.add2
-        ( nodeA.node.id, vec2 ( dx * 0.1 ) 0 )
-        ( nodeB.node.id, vec2 ( dx * -0.1 ) 0 )
+        ( nodeA.node.id, vec2 ( dx * -1.1 ) 0 )
+        ( nodeB.node.id, vec2 ( dx * 1.1 ) 0 )
       -- a muss unterhalb b sein
       <| if( ay + 80 > by )then
         Vec2Dict.add2
-          ( nodeA.node.id, vec2 0 -0.1 )
-          ( nodeB.node.id, vec2 0  0.1 )
+          ( nodeA.node.id, vec2 0 -1.1 )
+          ( nodeB.node.id, vec2 0  1.1 )
           forces
       else
         forces
