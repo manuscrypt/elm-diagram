@@ -6,6 +6,7 @@ import Visuals.Connection as Connection
 import Graph exposing (Graph, Node, Edge, NodeId)
 import List.Extra exposing (andThen)
 import Time exposing (Time)
+import Extra.Vec2Dict as Vec2Dict exposing( Vec2Dict )
 
 type alias Model =
   { graph : Graph Symbol.Model Connection.Model
@@ -28,28 +29,71 @@ update: Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Animate dt ->
-      animate dt model
-      -- model ! []
+      ( animate dt model )
+      -- model
+      ! []
 
-animate: Time -> Model -> ( Model, Cmd Msg )
+animate: Time -> Model -> Model
 animate dt model =
-  let funcs = [ forcesOneVsAll
-              --, forcesOneOnOne model
-              --, forcesForOne model
-              ]
-      sums = List.foldl identity model funcs
+  let
+      forces = calcForces model
+      graph' = Graph.mapNodes ( \node ->
+          let
+            force = ( Vec2Dict.get node.id forces )
+            velocity = -- v = a * t + v0
+              Vec2.scale ( dt * 0.0001 ) force
+              -- + oldVelocity * ( 1.0 - relaxingFactor * dt ) }
+            movement = -- s = 0.5 * a * t^2 + v0 * t
+              Vec2.scale ( dt ) velocity -- not correct
+            newpos = -- p = p0 + s
+              Vec2.add node.pos movement
+          in
+            { node | pos = newpos }
+        ) model.graph
+  in { model | graph = graph' }
 
-      -- group : List a -> List (List a)
-      -- group [1,2,2,3,3,3,2,2,1] == [[1],[2,2],[3,3,3],[2,2],[1]]
+calcForces : Model -> Vec2Dict
+calcForces model =
+  calcForcesOneVsAll model
+  --<| calcForcesOneOnOne model
+  --<| calcForcesForOne model
+  Vec2Dict.empty
+
+calcForcesOneVsAll : Model -> Vec2Dict -> Vec2Dict
+calcForcesOneVsAll model forces =
+  let nodes = symbols model
+      all = List.filter (\(a,b) -> a /= b)
+              <| nodes `andThen` \x ->
+                 nodes `andThen` \y ->
+                 [(x,y)]
+  in List.foldl ( \(a,b) f -> calcForcesForNoIntersection a b f ) forces all
+
+calcForcesForNoIntersection : Symbol.Model -> Symbol.Model -> Vec2Dict -> Vec2Dict
+calcForcesForNoIntersection elemA elemB forces =
+    let
+        minDistance = 40
+        posA = elemA.pos
+        posB = elemB.pos
+        diff = (Vec2.sub posA posB)
+        dist = (Vec2.length diff)
+    in
+        if (dist > minDistance) then
+            forces
+        else
+            let
+                norm =
+                    if (dist < 0.0001) then
+                        (vec2 1 1)
+                    else
+                        (Vec2.normalize diff)
+                factor = 0.01 + 0.1 * (minDistance - dist)
+            in
+              Vec2Dict.add2
+                ( elemA.id, (Vec2.scale factor norm) )
+                ( elemB.id, (Vec2.scale -factor norm) )
+                forces
 
 
-      (syms, cmds) = List.unzip <| List.map2 (applyForce dt) sums.forces <| symbols model
-
-      graph' = Graph.fromNodesAndEdges
-                  (List.map (\s -> Node s.id s) syms)
-                  (Graph.edges model.graph)
-
-  in { model | graph = graph' } ! []
 
 applyForce: Float -> (NodeId, Vec2) -> Symbol.Model -> (Symbol.Model, Cmd Symbol.Msg)
 applyForce dt (id,force) symbol =
