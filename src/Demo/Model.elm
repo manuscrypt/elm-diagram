@@ -10,15 +10,17 @@ import Task
 import Task.Extra as Task exposing (performFailproof)
 import Random exposing (Seed, initialSeed)
 import Date exposing (Date)
-import Model.ElmFile as ElmFile exposing (ElmFile, decodeList)
-import Model.ElmFileGraph as ElmFileGraph exposing (ElmFileGraph)
 import Json.Decode as Json
-import Json.Encode as Json
 import Result
-import Visuals.GraphListView as GraphListView
-import Visuals.Visualization as Visualization
 import Maybe
 import IntDict
+import Graph exposing (Graph, Node, Edge, NodeId)
+import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY)
+import Model.ElmFile as ElmFile exposing (ElmFile, decodeList)
+import Model.ElmFileGraph as ElmFileGraph exposing (ElmFileGraph)
+import Visuals.Graph.AsList as GraphListView
+import Visuals.Diagram.Diagram as Diagram
+import AnimationFrame
 
 
 type Msg
@@ -27,68 +29,70 @@ type Msg
     | SetErrorMsg String
     | Resize Size
     | TextInputChanged String
-    | Start
-    | Animate Time
-    | Stop
     | FetchRemote
     | SetGraph (ElmFileGraph)
     | RemoteFetched (List ElmFile)
-    | VisualizationMsg Visualization.Msg
+    | Start
+    | Stop
+    | Animate Time
+    | DiagramMsg Diagram.Msg
     | GraphListViewMsg GraphListView.Msg
 
 
 type alias Model =
     { graph : ElmFileGraph
+    , listView : GraphListView.Model ElmFile ()
     , graphString : String
+    , diagram : Diagram.Model
     , lastDt : Time
     , size : Vec2
     , errorMsg : String
     , now : Maybe Date
     , seed : Seed
-    , running : Bool
     , serverRunning : Bool
-    , visualization : Visualization.Model
-    , listView : GraphListView.Model ElmFile ()
+    , running : Bool
     }
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Sub.map VisualizationMsg <| Visualization.subscriptions model.visualization
+        [ if model.running then
+            AnimationFrame.diffs Animate
+          else
+            Sub.none
         ]
 
 
-init : ( Model, Cmd Msg )
-init =
+init : ElmFileGraph -> ( Model, Cmd Msg )
+init graph =
     let
-        graph =
-            Graph.empty
-
         ( lv, lvCmd ) =
             GraphListView.init graph (\node -> node.label.moduleName)
 
-        ( vis, visCmd ) =
-            Visualization.init graph (vec2 0 0)
+        ( model, cmd ) =
+            { graph = graph
+            , listView = lv
+            , diagram = Diagram.init graph
+            , graphString = ""
+            , lastDt = 0
+            , size = vec2 0 0
+            , errorMsg = ""
+            , seed = initialSeed Random.minInt
+            , now = Nothing
+            , serverRunning = False
+            , running = False
+            }
+                ! [ Time.now |> performFailproof Init
+                  , checkServerStatus
+                  , Cmd.map GraphListViewMsg lvCmd
+                    --, fetchData RemoteFetched
+                  ]
+
+        ( model', cmd' ) =
+            update (SetGraph graph) model
     in
-        { graph = graph
-        , graphString = ""
-        , lastDt = 0
-        , size = vec2 0 0
-        , errorMsg = ""
-        , seed = initialSeed Random.minInt
-        , now = Nothing
-        , running = False
-        , serverRunning = False
-        , visualization = vis
-        , listView = lv
-        }
-            ! [ Time.now |> performFailproof Init
-              , checkServerStatus
-              , Cmd.map GraphListViewMsg lvCmd
-              , Cmd.map VisualizationMsg visCmd
-              , fetchData RemoteFetched
-              ]
+        model' ! [ cmd, cmd' ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -116,20 +120,26 @@ update msg model =
             let
                 ( lv, lvCmd ) =
                     GraphListView.init graph (\x -> x.label.moduleName)
-
-                ( vis, visCmd ) =
-                    Visualization.init graph model.size
             in
                 { model
                     | graph = graph
-                    , graphString = Json.encode 2 <| ElmFile.encodeList <| List.map .label <| Graph.nodes graph
+                    , graphString = ElmFileGraph.toString graph
+                    , diagram =
+                        Diagram.update (Diagram.Resize (Vec2.scale 0.5 model.size))
+                            <| Diagram.init graph
                     , listView = lv
-                    , visualization = vis
                     , errorMsg = "Graph set"
                 }
-                    ! [ Cmd.map GraphListViewMsg lvCmd
-                      , Cmd.map VisualizationMsg visCmd
-                      ]
+                    ! [ Cmd.map GraphListViewMsg lvCmd ]
+
+        Start ->
+            { model | running = True } ! []
+
+        Stop ->
+            { model | running = False } ! []
+
+        Animate dt ->
+            update (DiagramMsg <| Diagram.Animate dt) { model | lastDt = dt }
 
         GraphListViewMsg msg ->
             let
@@ -156,24 +166,22 @@ update msg model =
             in
                 update (SetGraph graph) model
 
-        Start ->
-            { model | running = True } ! []
-
-        Stop ->
-            { model | running = False } ! []
-
         SetErrorMsg strErr ->
             { model | errorMsg = strErr } ! []
 
-        Animate dt ->
-            let
-                ( anim, animCmd ) =
-                    Visualization.update Visualization.Animate model.visualization
-            in
-                { model | lastDt = dt, visualization = anim } ! [ Cmd.map VisualizationMsg animCmd ]
-
         Resize size ->
-            { model | size = vec2 (toFloat size.width) (toFloat size.height) } ! []
+            let
+                vecSize =
+                    vec2 (toFloat size.width) (toFloat size.height)
+
+                diagram =
+                    Diagram.update (Diagram.Resize (Vec2.scale 0.5 vecSize)) model.diagram
+            in
+                { model
+                    | size = vecSize
+                    , diagram = diagram
+                }
+                    ! []
 
         FetchRemote ->
             { model | errorMsg = "Fetching..." } ! [ fetchData RemoteFetched ]
@@ -181,12 +189,8 @@ update msg model =
         RemoteFetched elmFiles ->
             update (SetGraph <| ElmFileGraph.fromFiles elmFiles) model
 
-        VisualizationMsg msg ->
-            let
-                ( d, dx ) =
-                    Visualization.update msg model.visualization
-            in
-                { model | visualization = d } ! [ Cmd.map VisualizationMsg dx ]
+        DiagramMsg msg ->
+            { model | diagram = Diagram.update msg model.diagram } ! []
 
 
 fetchData : (List ElmFile -> Msg) -> Cmd Msg

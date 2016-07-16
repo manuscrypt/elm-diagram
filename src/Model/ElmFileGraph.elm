@@ -2,7 +2,8 @@ module Model.ElmFileGraph exposing (..)
 
 import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
 import String
-import Model.ElmFile exposing (ElmFile, decodeList)
+import Model.ElmFile exposing (ElmFile, decodeList, encodeList)
+import Json.Encode as Json
 
 
 type alias ElmFileGraph =
@@ -41,3 +42,8 @@ findFile files name =
         [ List.head <| List.filter (\f -> f.moduleName == name) files
         , List.head <| List.filter (\f -> (String.dropRight 4 f.name) == name) files
         ]
+
+
+toString : ElmFileGraph -> String
+toString graph =
+    Json.encode 2 <| encodeList <| List.map .label <| Graph.nodes graph

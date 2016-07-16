@@ -1,10 +1,11 @@
-module Visuals.Grid exposing (..)
+module Visuals.Diagram.Grid exposing (..)
 
+import Math.Vector2 exposing (Vec2, vec2, getX, getY)
 import Extra.Svg exposing (Stroke, strokeToSA)
-import Color exposing (Color)
 import VirtualDom
 import Svg
 import Svg.Attributes as SA
+import Visuals.Defaults exposing (defaultGridStroke)
 
 
 type alias GridDef =
@@ -28,23 +29,32 @@ type alias GridLine =
     }
 
 
-defaultStroke : Stroke
-defaultStroke =
-    Stroke Color.lightBlue 0.15
+type Msg
+    = Resize Vec2
+
+
+defaultGridDef : Vec2 -> GridDef
+defaultGridDef size =
+    GridDef ( 0, getX size ) ( 0, getY size ) 25 defaultGridStroke
 
 
 empty : Model
 empty =
-    init ( 0, 0 ) ( 0, 0 ) 0
+    init <| defaultGridDef (vec2 0 0)
 
 
-init : ( Float, Float ) -> ( Float, Float ) -> Float -> Model
-init xs ys step =
-    let
-        def =
-            GridDef xs ys step defaultStroke
-    in
-        { def = def, lines = makeLines def }
+init : GridDef -> Model
+init def =
+    { def = def
+    , lines = makeLines def
+    }
+
+
+update : Msg -> Model -> Model
+update msg model =
+    case msg of
+        Resize size ->
+            init <| defaultGridDef size
 
 
 makeLines : GridDef -> List GridLine

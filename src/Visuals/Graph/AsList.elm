@@ -1,4 +1,4 @@
-module Visuals.GraphListView exposing (..)
+module Visuals.Graph.AsList exposing (..)
 
 import Graph exposing (Graph, Node, NodeContext, NodeId, Edge, Adjacency)
 import Html exposing (Html)

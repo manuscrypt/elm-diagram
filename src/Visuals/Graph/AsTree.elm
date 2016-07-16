@@ -1,4 +1,4 @@
-module Visuals.HtmlTree exposing (..)
+module Visuals.Graph.AsTree exposing (..)
 
 import Graph exposing (Graph, Node, NodeId, Edge, Adjacency)
 import Html exposing (Html)

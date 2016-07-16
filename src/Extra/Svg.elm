@@ -16,6 +16,18 @@ type alias Stroke =
     }
 
 
+textCentered : Vec2 -> String -> String -> Svg c
+textCentered pos style text =
+    Svg.text'
+        [ SA.x <| vecXtoString pos
+        , SA.y <| vecXtoString pos
+        , SA.textAnchor "middle"
+        , SA.alignmentBaseline "middle"
+        , SA.style style
+        ]
+        [ Svg.text text ]
+
+
 arrow : Vec2 -> Vec2 -> Stroke -> Color -> Svg a
 arrow targetPos unnormalizedDirection stroke fillcolor =
     let
@@ -49,7 +61,11 @@ arrow targetPos unnormalizedDirection stroke fillcolor =
 circle : Vec2 -> Float -> Stroke -> Color -> VirtualDom.Node a
 circle pos radius stroke fillcolor =
     Svg.circle
-        ([ SA.cx (vecXtoString pos), SA.cy (vecYtoString pos), SA.r (toString radius), SA.fill (colorToHex fillcolor) ]
+        ([ SA.cx (vecXtoString pos)
+         , SA.cy (vecYtoString pos)
+         , SA.r (toString radius)
+         , SA.fill (colorToHex fillcolor)
+         ]
             ++ (strokeToSA stroke)
         )
         []
