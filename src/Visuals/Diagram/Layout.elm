@@ -1,13 +1,38 @@
 module Visuals.Diagram.Layout exposing (..)
 
-import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY, add, scale, sub)
+import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY, add, scale, sub, length)
 import Time exposing (Time)
-import Visuals.Diagram.Node as Node
+import Visuals.Diagram.Node as Node exposing (zero)
 import IntDict exposing (IntDict)
+import String
 
 
 type alias Model n =
     List (Node.Model n)
+
+
+viewBox : Model n -> String
+viewBox model =
+    let
+        xs =
+            List.map (getX << .pos) model
+
+        ys =
+            List.map (getY << .pos) model
+
+        minx =
+            Maybe.withDefault 0 <| List.minimum xs
+
+        maxx =
+            Maybe.withDefault 0 <| List.maximum xs
+
+        miny =
+            Maybe.withDefault 0 <| List.minimum ys
+
+        maxy =
+            Maybe.withDefault 0 <| List.maximum ys
+    in
+        String.join " " <| List.map toString [ minx, miny, (maxx - minx), (maxy - miny) ]
 
 
 animate : Time -> Model n -> Model n
@@ -25,8 +50,8 @@ fiddle : Time -> Model n -> Model n
 fiddle time model =
     -- (\index force velocity ->
     --     -- v = a * t + v0
-    --     Vec2.add (Vec2.scale (dt * 0.0001) force)
-    --         (Vec2.scale (0.999) velocity)
+    --     add (scale (dt * 0.0001) force)
+    --         (scale (0.999) velocity)
     -- )
     model
 
@@ -62,7 +87,7 @@ calcForcesOneOnOne dt others body =
 
 calcForcesForOne : Time -> Model n -> Node.Model n -> List Vec2
 calcForcesForOne dt model body =
-    []
+    [ scale -0.4 body.vel ]
 
 
 
@@ -76,36 +101,44 @@ calcForcesForNoIntersection dt elemA elemB =
             50
 
         diff =
-            (Vec2.sub elemA.pos elemB.pos)
+            (sub elemA.pos elemB.pos)
 
         dist =
-            (Vec2.length diff)
+            (length diff)
     in
         if (dist > minDistance) then
             Nothing
         else
-            let
-                norm =
-                    if (dist < 0.0001) then
-                        (vec2 1 1)
-                    else
-                        (Vec2.normalize diff)
+            Just diff
 
-                factor =
-                    0.01 + 0.1 * (minDistance - dist)
-            in
-                Just <| Vec2.scale factor norm
+
+
+-- let
+--     norm =
+--         if (dist < 0.0001) then
+--             (vec2 1 1)
+--         else
+--             (normalize diff)
+--
+--     factor =
+--         0.01 + 0.1 * (minDistance - dist)
+-- in
+--     Just <| scale factor norm
 
 
 calcForcesOneOnOneFor : Time -> Node.Model n -> Node.Model n -> Vec2
 calcForcesOneOnOneFor dt nodeA nodeB =
-    let
-        -- a und b sollten gleiches x haben
-        -- b soll 80 unter a sein
-        target =
-            (vec2 0 80)
+    zero
 
-        diff =
-            sub nodeB.pos nodeA.pos
-    in
-        sub diff target
+
+
+-- let
+--     -- a und b sollten gleiches x haben
+--     -- b soll 80 unter a sein
+--     target =
+--         (vec2 0 80)
+--
+--     diff =
+--         sub nodeB.pos nodeA.pos
+-- in
+--     sub diff target

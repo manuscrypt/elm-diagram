@@ -76,7 +76,7 @@ view model =
             [ SA.version "1.1"
             , SA.width sw
             , SA.height sh
-            , SA.viewBox <| "0 0 " ++ sw ++ " " ++ sh
+            , SA.viewBox <| Layout.viewBox model.nodes
             , SA.textRendering "optimizeLegibility"
             ]
             ([ Grid.view model.grid ]
