@@ -75,10 +75,11 @@ view model =
 
 ----- KINEMATICS
 
+friction = 12.9501
 
 vel' : Velocity -> Acceleration -> DeltaTime -> Velocity
 vel' v0 a t =
-    add v0
+    add (scale ( max 0.0 ( 1.0 - ( t * friction ) ) ) v0 ) 
         (scale t a)
 
 
