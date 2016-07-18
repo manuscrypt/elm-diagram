@@ -63,7 +63,7 @@ update msg model =
             }
 
         Animate dt ->
-            { model | nodes = Layout.animate dt model.nodes }
+            { model | nodes = Layout.animate dt model.edges model.nodes }
 
 
 view : Model -> Svg a

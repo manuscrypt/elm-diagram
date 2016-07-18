@@ -21,27 +21,27 @@ viewBox model =
             List.map (getY << .pos) model
 
         minx =
-            Maybe.withDefault 0 <| List.minimum xs
+            ( Maybe.withDefault 0 <| List.minimum xs ) - 100
 
         maxx =
-            Maybe.withDefault 0 <| List.maximum xs
+            ( Maybe.withDefault 0 <| List.maximum xs ) + 100
 
         miny =
-            Maybe.withDefault 0 <| List.minimum ys
+            ( Maybe.withDefault 0 <| List.minimum ys ) - 100
 
         maxy =
-            Maybe.withDefault 0 <| List.maximum ys
+            ( Maybe.withDefault 0 <| List.maximum ys ) + 100
     in
         String.join " " <| List.map toString [ minx, miny, (maxx - minx), (maxy - miny) ]
 
 
-animate : Time -> Model n -> Model n
-animate dt model =
+animate : Time -> List ( Int, Int ) -> Model n -> Model n
+animate dt edges model =
     let
         timeInSecs =
             dt / 1000
     in
-        List.map (allForcesForOne timeInSecs model) model
+        List.map (allForcesForOne timeInSecs edges model) model
             |> fiddle timeInSecs
             |> List.map (Node.forward timeInSecs)
 
@@ -60,8 +60,8 @@ fiddle time model =
 --------------------
 
 
-allForcesForOne : Time -> Model n -> Node.Model n -> Node.Model n
-allForcesForOne dt model body =
+allForcesForOne : Time -> List ( Int, Int ) -> Model n -> Node.Model n -> Node.Model n
+allForcesForOne dt edges model body =
     let
         others =
             List.filter (\n -> n.id /= body.id) model
@@ -69,7 +69,7 @@ allForcesForOne dt model body =
         let
             forces =
                 (calcForcesOneVsAll dt others body)
-                    ++ (calcForcesOneOnOne dt others body)
+                    ++ (calcForcesOneOnOne dt edges others body)
                     ++ (calcForcesForOne dt model body)
         in
             { body | force = List.foldl add body.force forces }
@@ -79,10 +79,38 @@ calcForcesOneVsAll : Time -> List (Node.Model n) -> Node.Model n -> List Vec2
 calcForcesOneVsAll dt others body =
     List.filterMap (calcForcesForNoIntersection dt body) others
 
+getPosOf : Int -> List ( Node.Model n ) -> Vec2
+getPosOf id nodes =
+    let ff = List.filter ( \n -> n.id == id ) nodes
+    in case ff of
+      [a] -> a.pos
+      _ -> Debug.crash "node not found"
 
-calcForcesOneOnOne : Time -> List (Node.Model n) -> Node.Model n -> List Vec2
-calcForcesOneOnOne dt others body =
-    List.map (calcForcesOneOnOneFor dt body) others
+calcForcesOneOnOne : Time -> List ( Int, Int ) -> List (Node.Model n) -> Node.Model n -> List Vec2
+calcForcesOneOnOne dt edges others body =
+    let incEdges = List.filter ( \( fromId, toId ) -> fromId == body.id ) edges
+        incForces = List.map ( \( fromId, toId ) ->
+                      let toPos = getPosOf toId others
+                          fx = ( getX body.pos )
+                          fy = ( getY body.pos )
+                          tx = ( getX toPos )
+                          ty = ( getY toPos )
+                      in
+                        vec2
+                          (
+                            if( tx < tx )then 5 else if( fx > tx ) then -5 else 0
+                          )
+                          (  if( fy <= ty + 50 )then
+                                15 --( 0.51 * ( fy - 0 - ty ) )
+                             else
+                                0
+                          )
+                    ) incEdges
+        --outEdges = List.filter ( \( fromId, toId ) -> toId == body.id )
+    in
+      --List.concat <|
+        --List.map ( \( fromId, toId ) -> calcForcesOneOnOneFor dt body) edges
+        incForces
 
 
 calcForcesForOne : Time -> Model n -> Node.Model n -> List Vec2
