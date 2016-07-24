@@ -126,7 +126,7 @@ diagram model =
             , (,) "border" "1px solid violet"
             ]
         ]
-        [ Diagram.view model.diagram ]
+        [ App.map DiagramMsg <| Diagram.view model.diagram ]
 
 
 animationButtons : Model -> Html Msg

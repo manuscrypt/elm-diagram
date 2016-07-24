@@ -2,60 +2,53 @@ module Visuals.Diagram.Diagram exposing (..)
 
 import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY, add, scale, sub)
 import Svg exposing (Svg)
+import Html.App as App
 import Svg.Attributes as SA
 import Time exposing (Time)
 import Graph exposing (Graph, NodeContext, Node, Edge)
-import Visuals.Diagram.Layout as Layout
-import Visuals.Diagram.Node as Node
+--import Visuals.Diagram.Layout as Layout
 import Visuals.Diagram.Connection as Connection
 import Visuals.Diagram.Grid as Grid exposing (GridDef, defaultGridDef)
 import Model.CompilationUnit as CompilationUnit
 import Model.ElmFileGraph as ElmFileGraph exposing (ElmFileGraph)
-import Model.ElmFile as ElmFile exposing (ElmFile)
-import Visuals.Diagram.Node as Node
+import Visuals.Layout.Force.Body as Body
 import Tuple2
-
+import Visuals.Layout.Force.ForceLayoutCalculator as Layout
+import String
 
 type alias Model =
     { size : Vec2
     , grid : Grid.Model
-    , nodes : List (Node.Model CompilationUnit.Model)
-    , edges : List ( Int, Int )
+    , graph : Graph CompilationUnit.Model ()
+    , layout: Layout.Model
     }
 
-
 type Msg
-    = Resize Vec2
+    = NoOp
+    | Resize Vec2
     | Animate Time
-
 
 init : ElmFileGraph -> Model
 init graph =
     { size = vec2 0 0
     , grid = Grid.empty
-    , nodes =
-        Graph.nodes graph
-            |> List.map .label
-            |> List.map fileToNode
-    , edges =
-        Graph.edges graph
-            |> List.map (\e -> ( e.from, e.to ))
+    , graph = CompilationUnit.fromElmFileGraph graph
+    , layout = Layout.init graph
     }
 
-
-fileToNode : ElmFile -> Node.Model CompilationUnit.Model
-fileToNode file =
-    Node.init file.id (CompilationUnit.init file) (\n -> n.file.moduleName) (initialPosition file.id)
-
-
-initialPosition : Int -> Vec2
-initialPosition index =
-    vec2 (150.0 + ((toFloat (index - 20)) * -30.0)) (150.0 + ((toFloat (index - 20)) * 25.0))
-
+viewBox : Model -> String
+viewBox model =
+  let span = model.layout.state.span
+      (minx, miny) = (getX span.min, getY span.min)
+      (maxx, maxy) = (getX span.max, getY span.max)
+  in  String.join " " <| List.map toString [ minx, miny, (maxx - minx), (maxy - miny) ]
 
 update : Msg -> Model -> Model
 update msg model =
     case msg of
+        NoOp ->
+            model
+
         Resize size ->
             { model
                 | size = size
@@ -63,10 +56,13 @@ update msg model =
             }
 
         Animate dt ->
-            { model | nodes = Layout.animate dt model.edges model.nodes }
+          let layout = model.layout
+              layout' =
+                  { layout |  state = layout.step Layout.nodeView dt layout.state }
 
+          in { model | layout = layout' }
 
-view : Model -> Svg a
+view : Model -> Svg Msg
 view model =
     let
         ( sw, sh ) =
@@ -76,29 +72,38 @@ view model =
             [ SA.version "1.1"
             , SA.width sw
             , SA.height sh
-            , SA.viewBox <| Layout.viewBox model.nodes
+            , SA.viewBox <| "0 0 800 600" -- <| Layout.viewBox model.nodes
             , SA.textRendering "optimizeLegibility"
             ]
             ([ Grid.view model.grid ]
-                ++ (List.map Node.view model.nodes)
+                ++ viewNodes model
                 ++ viewConnections model
             )
 
 
+viewNodes: Model  -> List (Svg Msg)
+viewNodes model =
+  List.map (\n ->
+      let (vec,view) = model.layout.at Layout.nodeView model.layout.state n.id
+      in App.map (\_ -> NoOp ) <| view ) <| Graph.nodes model.layout.state.graph
+
+
+
 viewConnections : Model -> List (Svg a)
 viewConnections model =
-    List.map (edgeToNodeList model) model.edges
+  Graph.edges model.layout.state.graph |>
+      List.map (edgeToNodeList model)
         |> List.map Connection.init
         |> List.map Connection.view
 
 
-edgeToNodeList : Model -> ( Int, Int ) -> List (Node.Model CompilationUnit.Model)
-edgeToNodeList model edge =
-    Tuple2.mapBoth (byId model.nodes) edge
+edgeToNodeList : Model -> Edge (List Vec2) -> List Body.Model
+edgeToNodeList model {from, to, label} =
+    Tuple2.mapBoth (byId model.layout.state.graph) (from,to)
         |> Tuple2.toList
         |> List.filterMap identity
 
 
-byId : List (Node.Model CompilationUnit.Model) -> Int -> Maybe (Node.Model CompilationUnit.Model)
-byId nodes id =
-    List.head <| List.filter (\n -> n.id == id) nodes
+byId : Graph Body.Model (List Vec2) -> Int -> Maybe Body.Model
+byId graph id =
+  Maybe.map (.label << .node) <| Graph.get id graph

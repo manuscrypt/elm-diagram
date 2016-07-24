@@ -14,7 +14,6 @@ type alias ElmFile =
     , moduleName : String
     }
 
-
 decodeList : Json.Decode.Decoder (List ElmFile)
 decodeList =
     Json.Decode.list decodeElmFile

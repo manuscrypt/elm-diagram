@@ -8,17 +8,17 @@ import Extra.Spline
 import VirtualDom
 import Model.BaseTypes exposing (Position)
 import Visuals.Defaults exposing (defaultConnectionStroke)
-import Visuals.Diagram.Node as Node
+import Visuals.Layout.Force.Body as Body
 
 
-type alias Model n =
-    { nodes : List (Node.Model n)
+type alias Model =
+    { nodes : List (Body.Model)
     , points : List Position
     , stroke : Stroke
     }
 
 
-init : List (Node.Model n) -> Model n
+init : List (Body.Model) -> Model
 init list =
     { nodes = list
     , points = []
@@ -26,24 +26,22 @@ init list =
     }
 
 
-view : Model n -> Svg a
+view : Model -> Svg a
 view model =
-    Svg.g [] <| createSplines model.nodes
+  case List.map .pos model.nodes of
+    [a,b] ->
+      Svg.g [] (createEdge a b)
+    _ ->
+      Svg.g [] (createSplines model.nodes)
 
-
-
---createEdge model.from.pos model.to.pos
--- or -> createSplines
-
-
-createSplines : List (Node.Model n) -> List (VirtualDom.Node a)
+createSplines : List (Body.Model) -> List (Svg a)
 createSplines nodes =
     List.map .pos nodes
         |> Extra.Spline.splines
         |> List.map (Extra.Svg.toPath "stroke:black;stroke-width:1px;fill:none")
 
 
-createEdge : Position -> Position -> List (VirtualDom.Node a)
+createEdge : Position -> Position -> List (Svg a)
 createEdge fromPos toPos =
     [ (bezierLineWithDirection (add fromPos (vec2 0 20))
         (vec2 0 40)

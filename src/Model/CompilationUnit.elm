@@ -41,3 +41,6 @@ fromList strs =
 fromElmFileGraph : Graph ElmFile () -> Graph Model ()
 fromElmFileGraph elmFiles =
     Graph.mapNodes init elmFiles
+
+labelFunc: Model -> String
+labelFunc n = n.file.moduleName
