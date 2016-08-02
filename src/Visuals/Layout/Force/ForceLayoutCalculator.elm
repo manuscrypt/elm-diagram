@@ -22,7 +22,7 @@ fiddle : Time -> Body.Model -> Body.Model
 fiddle time body =
   { body | force = scale (0.0001) body.force
                --, vel = scale (0.54) body.vel
-               , accel = scale (0.9) body.accel
+               , accel = scale (0.019) body.accel
                }
 
 zeroSpan : Span
@@ -123,7 +123,8 @@ sameXAndBelow dt nodeA nodeB force =
         diff =
             sub nodeB.pos nodeA.pos
     in
-        sub diff target
+        -- needed? add force <| 
+          sub diff target
 
 
 
