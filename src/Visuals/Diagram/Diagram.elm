@@ -14,6 +14,7 @@ import Model.ElmFileGraph as ElmFileGraph exposing (ElmFileGraph)
 import Visuals.Layout.Force.Body as Body
 import Tuple2
 import Visuals.Layout.Force.ForceLayoutCalculator as Layout
+import Visuals.Layout.ViewportCalculator as ViewportCalculator
 import String
 
 type alias Model =
@@ -62,6 +63,11 @@ update msg model =
 
           in { model | layout = layout' }
 
+calcViewport : Model -> String
+calcViewport model =
+  let positions = List.map ( \n -> n.label.pos ) <| Graph.nodes model.layout.state.graph
+  in ViewportCalculator.fromPositions 100 positions
+
 view : Model -> Svg Msg
 view model =
     let
@@ -72,7 +78,8 @@ view model =
             [ SA.version "1.1"
             , SA.width sw
             , SA.height sh
-            , SA.viewBox <| "0 0 800 600" -- <| Layout.viewBox model.nodes
+            --, SA.viewBox <| "0 0 800 600" -- <| Layout.viewBox model.nodes
+            , SA.viewBox ( calcViewport model )
             , SA.textRendering "optimizeLegibility"
             ]
             ([ Grid.view model.grid ]
