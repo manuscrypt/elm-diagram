@@ -8,6 +8,7 @@ title: compiler-progress-visualization
 
 # Motivation
 * https://github.com/elm-lang/projects#visualize-compilation
+* [[elm-dev-mailing-list]]: https://groups.google.com/forum/m/#!topic/elm-dev/c1WfmH7063Y
 
 # Repos
 * https://github.com/ManuScriptHub/elm-diagram
