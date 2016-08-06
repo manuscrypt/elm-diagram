@@ -62,6 +62,7 @@ subscriptions model =
             AnimationFrame.diffs Animate
           else
             Sub.none
+        , Time.every Time.second UpdateTime
         ]
 
 
