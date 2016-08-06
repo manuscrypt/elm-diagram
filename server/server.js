@@ -3,10 +3,15 @@ var readdirp = require('readdirp')
   , es = require('event-stream')
   , http = require('http')
   , fs = require('fs')
-  , readline = require('readline');
+  , readline = require('readline')
+  , port = process.env.PORT || 3001
+  , https = require('https')
 
+var privateKey  = fs.readFileSync('/etc/ssl/private/server.key', 'utf8');
+var certificate = fs.readFileSync('/etc/ssl/certs/server.crt', 'utf8');
+var credentials = {key: privateKey, cert: certificate};
 
-http.createServer(function (req, res) {
+const app = function (req, res) {
 
     res.setHeader('Access-Control-Allow-Origin', '*');
 	res.setHeader('Access-Control-Request-Method', '*');
@@ -43,4 +48,14 @@ http.createServer(function (req, res) {
     }).on( 'end', function() {
         res.end( JSON.stringify(files));
     });
-}).listen(3001);
+};
+
+var httpServer = http.createServer(app);
+httpServer.listen(8080, function(){
+  console.log('Http listening on 8080');
+});
+
+var httpsServer = https.createServer(credentials,app);
+httpsServer.listen(port, function(){
+   console.log('Https listening on port ' + port);
+});
