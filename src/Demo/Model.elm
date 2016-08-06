@@ -63,6 +63,7 @@ subscriptions model =
           else
             Sub.none
         , Time.every Time.second UpdateTime
+        , Window.resizes Resize
         ]
 
 
