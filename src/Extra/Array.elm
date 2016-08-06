@@ -1,4 +1,4 @@
-module Extra.Array exposing (..)
+module Extra.Array exposing (getAt, setAt)
 
 import Array exposing (get, set, Array)
 

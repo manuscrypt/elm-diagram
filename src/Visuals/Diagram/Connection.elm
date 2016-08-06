@@ -5,7 +5,6 @@ import Math.Vector2 exposing (Vec2, vec2, getX, getY, add)
 import Color exposing (Color)
 import Extra.Svg exposing (Stroke, bezierLineWithDirection, arrow)
 import Extra.Spline
-import VirtualDom
 import Model.BaseTypes exposing (Position)
 import Visuals.Defaults exposing (defaultConnectionStroke)
 import Visuals.Layout.Force.Body as Body

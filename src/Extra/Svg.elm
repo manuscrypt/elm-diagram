@@ -4,10 +4,13 @@ import Svg exposing (Svg)
 import Svg.Attributes as SA
 import Color exposing (Color)
 import Math.Vector2 exposing (Vec2, vec2, getX, getY)
-import Extra.MathVector2
 import VirtualDom exposing (Node)
 import String
 import Color.Convert exposing (colorToHex)
+import Svg exposing (..)
+import Svg.Attributes as SA exposing (..)
+import Extra.Vec2 as Vec2 exposing (..)
+import Math.Vector2 as Vec2 exposing (Vec2, vec2, getX, getY, fromTuple)
 
 
 type alias Stroke =
@@ -38,7 +41,7 @@ arrow targetPos unnormalizedDirection stroke fillcolor =
             Math.Vector2.add targetPos (Math.Vector2.scale 15 fromdir)
 
         rightdir =
-            (Math.Vector2.scale 5 (Extra.MathVector2.rotate fromdir 90))
+            (Math.Vector2.scale 5 (Vec2.rotate fromdir 90))
 
         leftdir =
             Math.Vector2.scale -1 rightdir
@@ -193,6 +196,12 @@ translate : Vec2 -> String
 translate pos =
     "translate (" ++ (toString <| getX pos) ++ "," ++ (toString <| getY pos) ++ ")"
 
+translateTransform : Vec2 -> Svg.Attribute b
+translateTransform pos =
+    SA.transform <| "translate (" ++ (toString <| getX pos) ++ "," ++ (toString <| getY pos) ++ ")"
+
+
+
 
 s : Vec2 -> String
 s s =
@@ -223,6 +232,78 @@ vecToSvgPos : Vec2 -> String
 vecToSvgPos vec =
     (toString <| getX vec) ++ " " ++ (toString <| getY vec)
 
+
+roundedRect : Vec2 -> Vec2 -> Float -> String -> Svg a
+roundedRect pos size cornerRadius styleString =
+    let
+        ( px, py ) =
+            (toStringTuple pos)
+
+        ( sx, sy ) =
+            (toStringTuple size)
+
+        r =
+            (toString cornerRadius)
+    in
+        Svg.rect
+            [ x px
+            , y py
+            , SA.width sx
+            , SA.height sy
+            , rx r
+            , ry r
+            , SA.style styleString
+            ]
+            []
+
+
+
+-- fromList : Vec2 -> List (Svg a) -> Html a
+-- fromList size content =
+--     let
+--         viewRect =
+--             [ -size.x / 2
+--             , -size.y / 2
+--             , size.x
+--             , size.y
+--             ]
+--
+--         --,
+--     in
+--         Svg.svg [ viewBox (join " " <| map toString viewRect) ] content
+--
+--
+
+
+makeText : String -> Vec2 -> Float -> String -> Svg a
+makeText str pos textHeight textStyle =
+    text'
+        [ SA.x (toString <| getX pos)
+        , SA.y (toString <| getY pos)
+        , SA.fontSize (toString textHeight)
+        , SA.style textStyle
+        ]
+        [ Svg.text str ]
+
+
+
+-- main : Html a
+-- main =
+--     let
+--         pos =
+--             vec2 150 150
+--
+--         size =
+--             vec2 20 50
+--
+--         rr =
+--             roundedRect pos size 5 "stroke: blue; stroke-width: 1"
+--     in
+--         Svg.svg [ viewBox "0 0 300 300" ] [ rr ]
+--
+--
+
+--in
 
 main : Node a
 main =
