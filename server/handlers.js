@@ -52,6 +52,9 @@ util.staticHandler = function(filename) {
 };
 
 util.get('/', util.staticHandler('public/index.html'));
+util.get('/favicon.ico', util.staticHandler('public/favicon.ico'));
+util.get('favicon.ico', util.staticHandler('public/favicon.ico'));
+
 util.get('/deps', function(req, res){
     var files = [];
     var id = 0;
