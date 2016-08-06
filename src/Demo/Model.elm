@@ -25,6 +25,7 @@ import AnimationFrame
 
 type Msg
     = Init Time
+    | UpdateTime Time
     | ServerReachable Bool
     | SetErrorMsg String
     | Resize Size
@@ -41,7 +42,7 @@ type Msg
 
 type alias Model =
     { graph : ElmFileGraph
-    , listView : GraphListView.Model ElmFile ()
+    , listView : GraphListView.Model ElmFile
     , graphString : String
     , diagram : Diagram.Model
     , lastDt : Time
@@ -68,7 +69,7 @@ init : ElmFileGraph -> ( Model, Cmd Msg )
 init graph =
     let
         ( lv, lvCmd ) =
-            GraphListView.init graph (\node -> node.label.moduleName)
+            GraphListView.init (\node -> node.label.moduleName)
 
         ( model, cmd ) =
             { graph = graph
@@ -99,11 +100,12 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Init time ->
-            { model
-                | now = Just <| Date.fromTime time
-                , seed = Random.initialSeed (round time)
-            }
-                ! [ Window.size |> performFailproof Resize ]
+          let (withTime, withTimeCmd) = update (UpdateTime time) { model |  seed = Random.initialSeed (round time) }
+          in withTime ! [withTimeCmd, Window.size |> performFailproof Resize]
+
+        UpdateTime time ->
+              { model | now = Just <| Date.fromTime time} ! []
+
 
         ServerReachable b ->
             { model
@@ -119,7 +121,7 @@ update msg model =
         SetGraph graph ->
             let
                 ( lv, lvCmd ) =
-                    GraphListView.init graph (\x -> x.label.moduleName)
+                    GraphListView.init (\x -> x.label.moduleName)
             in
                 { model
                     | graph = graph

@@ -46,7 +46,7 @@ left model =
         , controls model
         , Html.div [ HA.style [ (,) "flex-flow" "row nowrap", (,) "display" "flex" ] ]
             [ Html.div [ HA.style [ (,) "flex" "auto" ] ] [ HtmlTree.viewGraph model.graph ]
-            , Html.div [ HA.style [ (,) "flex" "auto" ] ] [ App.map GraphListViewMsg <| GraphListView.view model.listView ]
+            , Html.div [ HA.style [ (,) "flex" "auto" ] ] [ App.map GraphListViewMsg <| GraphListView.view model.listView model.graph ]
             ]
         ]
 

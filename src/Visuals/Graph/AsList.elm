@@ -7,9 +7,8 @@ import Html.Events as HE
 import IntDict
 
 
-type alias Model a b =
-    { graph : Graph a b
-    , labelFunc : Node a -> String
+type alias Model a =
+    { labelFunc : Node a -> String
     , selectedId : Maybe NodeId
     , hoveringId : Maybe NodeId
     }
@@ -21,17 +20,16 @@ type Msg
     | Unhover
 
 
-init : Graph a b -> (Node a -> String) -> ( Model a b, Cmd Msg )
-init g labelFunc =
-    { graph = g
-    , labelFunc = labelFunc
+init : (Node a -> String) -> ( Model a, Cmd Msg )
+init labelFunc =
+    { labelFunc = labelFunc
     , selectedId = Nothing
     , hoveringId = Nothing
     }
         ! []
 
 
-update : Msg -> Model a b -> ( Model a b, Cmd Msg )
+update : Msg -> Model a -> ( Model a, Cmd Msg )
 update msg model =
     case msg of
         SelectNode nodeId ->
@@ -44,21 +42,25 @@ update msg model =
             { model | hoveringId = Nothing } ! []
 
 
-view : Model a b -> Html Msg
-view model =
-    Html.div [ flexHoriz ] [ nodeList model, nodeDetail model ]
-
-
-nodeList : Model a b -> Html Msg
-nodeList model =
+view : Model a -> Graph a b -> Html Msg
+view model graph =
     let
         nodes =
-            Graph.nodes model.graph
+            Graph.nodes graph
     in
-        Html.div [ flexVert ] (List.map (nodeCard model) nodes)
+        Html.div
+            [ flexHoriz
+            ]
+            [ Html.div
+                [ flexVert
+                ]
+              <|
+                (List.map (nodeCard model) nodes)
+                    ++ [ nodeDetail model graph ]
+            ]
 
 
-nodeCard : Model a b -> Node a -> Html Msg
+nodeCard : Model a -> Node a -> Html Msg
 nodeCard model node =
     Html.div
         [ cardStyle node model
@@ -69,8 +71,8 @@ nodeCard model node =
         [ Html.text <| (toString node.id) ++ ": " ++ (model.labelFunc node) ]
 
 
-nodeDetail : Model a b -> Html Msg
-nodeDetail model =
+nodeDetail : Model a -> Graph a b -> Html Msg
+nodeDetail model graph =
     let
         content =
             case model.selectedId of
@@ -78,40 +80,40 @@ nodeDetail model =
                     [ Html.text "nothing selected" ]
 
                 Just id ->
-                    case Graph.get id model.graph of
+                    case Graph.get id graph of
                         Nothing ->
                             [ Html.text <| "invalid node-id: " ++ (toString id) ]
 
                         Just ctx ->
-                            [ Html.div [ bb ] [ Html.text <| "Id: " ++ (toString ctx.node.id) ++ ", Label: " ++ toString ctx.node.label ]
-                            , Html.div [ bb ]
+                            [ Html.div [ bottomBordered ] [ Html.text <| "Id: " ++ (toString ctx.node.id) ++ ", Label: " ++ toString ctx.node.label ]
+                            , Html.div [ bottomBordered ]
                                 [ Html.text <| "in: " ++ (toString <| IntDict.size ctx.incoming)
-                                , viewAdjacent ctx.incoming model
+                                , viewAdjacent ctx.incoming model graph
                                 ]
-                            , Html.div [ bb ]
+                            , Html.div [ bottomBordered ]
                                 [ Html.text <| "out: " ++ (toString <| IntDict.size ctx.outgoing)
-                                , viewAdjacent ctx.outgoing model
+                                , viewAdjacent ctx.outgoing model graph
                                 ]
                             ]
     in
         Html.div [ HA.style [ (,) "width" "100%", (,) "padding" "20px" ] ] content
 
 
-viewAdjacent : Adjacency b -> Model a b -> Html Msg
-viewAdjacent adj model =
+viewAdjacent : Adjacency b -> Model a -> Graph a b -> Html Msg
+viewAdjacent adj model graph =
     let
         ctxs =
-            List.filterMap (\e -> Graph.get e model.graph) <| IntDict.keys adj
+            List.filterMap (\e -> Graph.get e graph) <| IntDict.keys adj
     in
         Html.div [] (List.map (nodeCard model << .node) ctxs)
 
 
-bb : Html.Attribute a
-bb =
+bottomBordered : Html.Attribute a
+bottomBordered =
     HA.style [ (,) "border-bottom" "1px solid black", (,) "padding" "4px" ]
 
 
-selectStyle : Node a -> Model a b -> List ( String, String )
+selectStyle : Node a -> Model a -> List ( String, String )
 selectStyle node model =
     case model.selectedId of
         Nothing ->
@@ -124,7 +126,7 @@ selectStyle node model =
                 []
 
 
-hoverStyle : Node a -> Model a b -> List ( String, String )
+hoverStyle : Node a -> Model a -> List ( String, String )
 hoverStyle node model =
     case model.hoveringId of
         Nothing ->
@@ -137,7 +139,7 @@ hoverStyle node model =
                 []
 
 
-cardStyle : Node a -> Model a b -> Html.Attribute Msg
+cardStyle : Node a -> Model a -> Html.Attribute Msg
 cardStyle n model =
     HA.style
         ([ (,) "flex" "auto"
