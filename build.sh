@@ -13,3 +13,5 @@ elm-package install --yes
 mkdir -p build
 
 elm-make src/DemoProgram.elm --output build/index.html
+
+cp build/index.html server/public/index.html

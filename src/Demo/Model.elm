@@ -194,7 +194,7 @@ update msg model =
 
 
 serviceUrl: String
-serviceUrl = "http://185.48.228.66:3001/"
+serviceUrl = "/deps"
 
 fetchData : (List ElmFile -> Msg) -> Cmd Msg
 fetchData msg =
