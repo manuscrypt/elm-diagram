@@ -193,16 +193,19 @@ update msg model =
             { model | diagram = Diagram.update msg model.diagram } ! []
 
 
+serviceUrl: String
+serviceUrl = "http://185.48.228.66:3001/"
+
 fetchData : (List ElmFile -> Msg) -> Cmd Msg
 fetchData msg =
     Task.perform (\err -> SetErrorMsg <| Http.httpErrorToString err) msg
-        <| Http.get decodeList "http://localhost:3001"
+        <| Http.get decodeList serviceUrl
 
 
 checkServerStatus : Cmd Msg
 checkServerStatus =
     Task.perform (\_ -> ServerReachable False) (\_ -> ServerReachable True)
-        <| head "http://localhost:3001"
+        <| head serviceUrl
 
 
 head : String -> Task.Task Http.RawError Http.Response
