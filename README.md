@@ -8,15 +8,11 @@ title: compiler-progress-visualization
 
 # Motivation
 * https://github.com/elm-lang/projects#visualize-compilation
-* [[elm-dev-mailing-list]]: https://groups.google.com/forum/m/#!topic/elm-dev/c1WfmH7063Y
+* https://groups.google.com/forum/m/#!topic/elm-dev/c1WfmH7063Y
 
-# Repos
-* https://github.com/ManuScriptHub/elm-diagram
-
-# Demo
+# Demos
 * http://185.48.228.66:3001/ (with server)
 * https://manuscripthub.github.io/elm-diagram/index.html (without server)
-* [[node-elm-diagram-server]]
 
 # To consider
 * https://www.google.com/patents/US7028023
@@ -24,6 +20,10 @@ title: compiler-progress-visualization
 * http://www.graphviz.org/Documentation/TSE93.pdf
 * https://github.com/rundis/elm-light#dependency-graph
 * [[ohanhi]] wants to help too
+* https://github.com/JohnBugner/elm-compilation-visualization
+
+# Repos
+* https://github.com/ManuScriptHub/elm-diagram
 
 # Community
 * https://github.com/rundis/elm-light#dependency-graph
