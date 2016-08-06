@@ -13,7 +13,8 @@ title: compiler-progress-visualization
 * https://github.com/ManuScriptHub/elm-diagram
 
 # Demo
-* https://manuscripthub.github.io/elm-diagram/index.html
+* http://185.48.228.66:3001/ (with server)
+* https://manuscripthub.github.io/elm-diagram/index.html (without server)
 * [[node-elm-diagram-server]]
 
 # To consider
