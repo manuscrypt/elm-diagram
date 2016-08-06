@@ -1,25 +1,15 @@
 #!/bin/bash
 
-FAIL=0
-
-elm-package install -y &
+rm -rf build
+rm -rf elm-stuff
+rm -rf server/node_modules
 
 cd server
-npm i &
+npm install
 cd ..
 
+elm-package install --yes
 
-for job in `jobs -p`
-do
-echo $job
-    wait $job || let "FAIL+=1"
-done
+mkdir -p build
 
-echo $FAIL
-
-if [ "$FAIL" == "0" ];
-then
-elm-make --output build/index.html
-else
-echo "FAILED! ($FAIL)"
-fi
+elm-make src/DemoProgram.elm --output build/index.html
